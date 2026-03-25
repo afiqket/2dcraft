@@ -17,12 +17,14 @@ const RECT_DATA = {
 }
 
 const map = [
-  [0, 0, 1, 0, 0],
-  [0, 1, 1, 1, 0],
+  [1, 1, 1, 0, 0],
+  [1, 1, 1, 1, 0],
   [1, 1, 1, 1, 1],
   [0, 1, 1, 1, 0],
   [0, 0, 1, 0, 0]
 ]
+
+const TREE_POSITION = {x: 1, y: 1}
 
 class GameScene extends Phaser.Scene {
   constructor() {
@@ -32,18 +34,18 @@ class GameScene extends Phaser.Scene {
     this.blockGroup;
     this.hoverBox;
     this.isHoverOnPlayer = false;
+    this.tree;
   }
 
   preload() {
+    this.load.image("tree", "./assets/tree.png")
   }
 
   create() {
     // Disable normal right click
     this.input.mouse.disableContextMenu();
-
-    // Blocks on the ground
-    this.blockGroup = this.physics.add.staticGroup();
-
+    
+    // Red outline box when a block is hovered 
     this.hoverBox = this.add.rectangle(
       0,
       0,
@@ -52,16 +54,18 @@ class GameScene extends Phaser.Scene {
       0x000000,
       0
     ).setOrigin(0, 0)
-      .setStrokeStyle(2, 0xff0000, 1)
-      .setDepth(DEPTHS.HOVER)
-      .setVisible(false)
+    .setStrokeStyle(2, 0xff0000, 1)
+    .setDepth(DEPTHS.HOVER)
+    .setVisible(false)
 
     this.physics.add.existing(this.hoverBox, true)
 
+    // Blocks on the ground
+    this.blockGroup = this.physics.add.staticGroup();
     for (let i = 0; i < map.length; i++) {
       for (let j = 0; j < map[i].length; j++) {
-        const blockType = map[i][j] ? "grass" : "water"
-        const color = map[i][j] ? 0x77DD77 : 0x4f92d4
+        const blockType = map[j][i] ? "grass" : "water"
+        const color = map[j][i] ? 0x77DD77 : 0x4f92d4
 
         const rect = this.add.rectangle(
           i * RECTANGLE_SIZE,
@@ -135,6 +139,14 @@ class GameScene extends Phaser.Scene {
     this.player.setDepth(DEPTHS.PLAYER)
     this.physics.add.existing(this.player)
 
+    // Tree
+    this.tree = this.add.image(TREE_POSITION.x * RECTANGLE_SIZE, TREE_POSITION.y * RECTANGLE_SIZE, "tree")
+    .setOrigin(0, 0)
+    .setDepth(DEPTHS.BLOCKONTOP)
+    .setDisplaySize(RECTANGLE_SIZE, RECTANGLE_SIZE)
+    this.textures.get("tree").setFilter(Phaser.Textures.FilterMode.NEAREST);
+    this.physics.add.existing(this.tree, true)
+
     // Controls
     /** @type {Phaser.Types.Input.Keyboard.CursorKeys} */
     this.inputs = this.input.keyboard.createCursorKeys()
@@ -142,6 +154,7 @@ class GameScene extends Phaser.Scene {
     // Collision
     this.player.body.setCollideWorldBounds(true)
     this.physics.add.collider(this.player, this.blockGroup)
+    this.physics.add.collider(this.player, this.tree)
 
   }
 
@@ -189,6 +202,7 @@ const config = {
       // debug: true,
     },
   },
+  // pixelArt: true,
   scene: [GameScene],
 };
 
