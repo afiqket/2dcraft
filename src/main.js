@@ -40,6 +40,7 @@ class GameScene extends Phaser.Scene {
     this.tree;
     this.emitter;
     this.inventoryText;
+    this.inventoryWoodCount = 0;
   }
 
   preload() {
@@ -95,7 +96,7 @@ class GameScene extends Phaser.Scene {
 
         tile.on("pointerdown", (pointer) => {
           if (pointer.rightButtonDown()) {
-            if (tile.getData(TILE_DATA.BLOCK) || this.isInvalidPlacement) {
+            if (tile.getData(TILE_DATA.BLOCK) || this.isInvalidPlacement || this.inventoryWoodCount === 0) {
               return
             }
 
@@ -113,11 +114,16 @@ class GameScene extends Phaser.Scene {
 
             this.physics.add.existing(block, true)
             this.tileGroup.add(block)
+
+            this.inventoryWoodCount -= 1
+            this.inventoryText.setText(`WOOD: ${this.inventoryWoodCount}`)
           }
           else if (pointer.leftButtonDown()) {
             const block = tile.getData(TILE_DATA.BLOCK)
 
             if (block) {
+              this.inventoryWoodCount += 1
+              this.inventoryText.setText(`WOOD: ${this.inventoryWoodCount}`)
               block.destroy()
               tile.setData(TILE_DATA.BLOCK, null)
             }
@@ -181,12 +187,12 @@ class GameScene extends Phaser.Scene {
       duration: 100,
       emitting: false
     }).setDepth(DEPTHS.PLAYER)
-    
+
     // Text (Inventory)
     this.inventoryText = this.add.text(20, CANVAS_HEIGHT - 40, "WOOD: 0", {
-        font: "25px Monospace",
-        fill: "#000000"
-      })
+      font: "25px Monospace",
+      fill: "#000000"
+    })
 
     // Controls
     /** @type {Phaser.Types.Input.Keyboard.CursorKeys} */
@@ -231,6 +237,8 @@ class GameScene extends Phaser.Scene {
 
     if (this.tree.getData(TREE_DATA.HEALTH) <= 0) {
       this.tree.destroy()
+      this.inventoryWoodCount += 5
+      this.inventoryText.setText(`WOOD: ${this.inventoryWoodCount}`)
     }
   }
 }
