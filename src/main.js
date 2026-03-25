@@ -7,13 +7,12 @@ const RECTANGLE_SIZE = 100
 const PLAYER_SPEED = 200
 const DEPTHS = {
   BLOCKS: 0,
-  HOVER: 10,
-  BLOCKONTOP: 20,
+  BLOCKONTOP: 10,
+  HOVER: 20,
   PLAYER: 30
 }
 const RECT_DATA = {
   BLOCK_TYPE: "blockType",
-  HOVER_BOX: "hoverBox",
   BLOCK_ON_TOP: "blockOnTop"
 }
 
@@ -31,7 +30,7 @@ class GameScene extends Phaser.Scene {
     this.player;
     this.inputs;
     this.blockGroup;
-    this.hoverGroup;
+    this.hoverBox;
     this.isHoverOnPlayer = false;
   }
 
@@ -44,7 +43,20 @@ class GameScene extends Phaser.Scene {
 
     // Blocks on the ground
     this.blockGroup = this.physics.add.staticGroup();
-    this.hoverGroup = this.physics.add.staticGroup();
+
+    this.hoverBox = this.add.rectangle(
+      0,
+      0,
+      RECTANGLE_SIZE,
+      RECTANGLE_SIZE,
+      0x000000,
+      0
+    ).setOrigin(0,0)
+    .setStrokeStyle(2, 0xff0000, 1)
+    .setDepth(DEPTHS.HOVER)
+    .setVisible(false)
+
+    this.physics.add.existing(this.hoverBox, true)
 
     for (let i = 0; i < map.length; i++) {
       for (let j = 0; j < map[i].length; j++) {
@@ -104,24 +116,13 @@ class GameScene extends Phaser.Scene {
         )
 
         rect.on("pointerover", () => {
-          rect.hoverBox = this.add.rectangle(
-            rect.x,
-            rect.y,
-            RECTANGLE_SIZE,
-            RECTANGLE_SIZE,
-            0x000000,
-            0
-          ).setOrigin(0,0)
-          .setStrokeStyle(2, 0xff0000, 1)
-          .setDepth(DEPTHS.HOVER)
-
-          this.physics.add.existing(rect.hoverBox, true)
-
-          this.hoverGroup.add(rect.hoverBox)
+          this.hoverBox.setPosition(rect.x, rect.y)
+          this.hoverBox.setVisible(true)
+          this.hoverBox.body.updateFromGameObject()
         })
 
         rect.on("pointerout", () => {
-          rect.hoverBox.destroy()
+          this.hoverBox.setVisible(false)
         })
 
         rect.setDepth(DEPTHS.BLOCKS)
@@ -168,7 +169,7 @@ class GameScene extends Phaser.Scene {
 
     this.player.body.setVelocity(vec.x, vec.y);
 
-    if (this.physics.overlap(this.player, this.hoverGroup)) {
+    if (this.physics.overlap(this.player, this.hoverBox)) {
       this.isHoverOnPlayer = true
     } else {
       this.isHoverOnPlayer = false
