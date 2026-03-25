@@ -3,17 +3,17 @@ import Phaser from "phaser"
 
 const CANVAS_WIDTH = 500
 const CANVAS_HEIGHT = 500
-const RECTANGLE_SIZE = 100
+const TILE_SIZE = 100
 const PLAYER_SPEED = 200
 const DEPTHS = {
-  BLOCKS: 0,
-  BLOCKONTOP: 10,
+  TILES: 0,
+  BLOCKS: 10,
   HOVER: 20,
   PLAYER: 30
 }
-const RECT_DATA = {
-  BLOCK_TYPE: "blockType",
-  BLOCK_ON_TOP: "blockOnTop"
+const TILE_DATA = {
+  TILE_TYPE: "TILE_TYPE",
+  BLOCK: "BLOCK"
 }
 
 const map = [
@@ -31,7 +31,7 @@ class GameScene extends Phaser.Scene {
     super("scene-game");
     this.player;
     this.inputs;
-    this.blockGroup;
+    this.tileGroup;
     this.hoverBox;
     this.isHoverOnPlayer = false;
     this.tree;
@@ -45,12 +45,12 @@ class GameScene extends Phaser.Scene {
     // Disable normal right click
     this.input.mouse.disableContextMenu();
     
-    // Red outline box when a block is hovered 
+    // Red outline box when a tile is hovered 
     this.hoverBox = this.add.rectangle(
       0,
       0,
-      RECTANGLE_SIZE,
-      RECTANGLE_SIZE,
+      TILE_SIZE,
+      TILE_SIZE,
       0x000000,
       0
     ).setOrigin(0, 0)
@@ -61,89 +61,89 @@ class GameScene extends Phaser.Scene {
     this.physics.add.existing(this.hoverBox, true)
 
     // Blocks on the ground
-    this.blockGroup = this.physics.add.staticGroup();
+    this.tileGroup = this.physics.add.staticGroup();
     for (let i = 0; i < map.length; i++) {
       for (let j = 0; j < map[i].length; j++) {
-        const blockType = map[j][i] ? "grass" : "water"
+        const tileType = map[j][i] ? "grass" : "water"
         const color = map[j][i] ? 0x77DD77 : 0x4f92d4
 
-        const rect = this.add.rectangle(
-          i * RECTANGLE_SIZE,
-          j * RECTANGLE_SIZE,
-          RECTANGLE_SIZE,
-          RECTANGLE_SIZE,
+        const tile = this.add.rectangle(
+          i * TILE_SIZE,
+          j * TILE_SIZE,
+          TILE_SIZE,
+          TILE_SIZE,
           color,
           1
         ).setOrigin(0, 0)
 
-        rect.setStrokeStyle(1, 0x444444, 1)
+        tile.setStrokeStyle(1, 0x444444, 1)
 
-        this.physics.add.existing(rect, true)
+        this.physics.add.existing(tile, true)
 
-        rect.setData(RECT_DATA.BLOCK_TYPE, blockType)
-        rect.setData(RECT_DATA.BLOCK_ON_TOP, null)
-        rect.setData(RECT_DATA.HOVER_BOX, null)
+        tile.setData(TILE_DATA.TILE_TYPE, tileType)
+        tile.setData(TILE_DATA.BLOCK, null)
+        tile.setData(TILE_DATA.HOVER_BOX, null)
 
         // Required for mouse click events
-        rect.setInteractive()
+        tile.setInteractive()
 
-        rect.on("pointerdown", (pointer) => {
+        tile.on("pointerdown", (pointer) => {
           if (pointer.leftButtonDown()) {
-            if (rect.getData(RECT_DATA.BLOCK_ON_TOP) || this.isHoverOnPlayer) {
+            if (tile.getData(TILE_DATA.BLOCK) || this.isHoverOnPlayer) {
               return
             }
 
-            const blockOnTop = this.add.rectangle(
-              rect.x,
-              rect.y,
-              RECTANGLE_SIZE,
-              RECTANGLE_SIZE,
+            const block = this.add.rectangle(
+              tile.x,
+              tile.y,
+              TILE_SIZE,
+              TILE_SIZE,
               0x895129,
               1
             ).setOrigin(0, 0)
-              .setDepth(DEPTHS.BLOCKONTOP)
+              .setDepth(DEPTHS.BLOCKS)
 
-            rect.setData(RECT_DATA.BLOCK_ON_TOP, blockOnTop)
+            tile.setData(TILE_DATA.BLOCK, block)
 
-            this.physics.add.existing(blockOnTop, true)
-            this.blockGroup.add(blockOnTop)
+            this.physics.add.existing(block, true)
+            this.tileGroup.add(block)
           }
           else if (pointer.rightButtonDown()) {
-            const blockOnTop = rect.getData(RECT_DATA.BLOCK_ON_TOP)
+            const block = tile.getData(TILE_DATA.BLOCK)
 
-            if (blockOnTop) {
-              blockOnTop.destroy()
-              rect.setData(RECT_DATA.BLOCK_ON_TOP, null)
+            if (block) {
+              block.destroy()
+              tile.setData(TILE_DATA.BLOCK, null)
             }
           }
         }
         )
 
-        rect.on("pointerover", () => {
-          this.hoverBox.setPosition(rect.x, rect.y)
+        tile.on("pointerover", () => {
+          this.hoverBox.setPosition(tile.x, tile.y)
           this.hoverBox.setVisible(true)
           this.hoverBox.body.updateFromGameObject()
         })
 
-        rect.on("pointerout", () => {
+        tile.on("pointerout", () => {
           this.hoverBox.setVisible(false)
         })
 
-        rect.setDepth(DEPTHS.BLOCKS)
+        tile.setDepth(DEPTHS.TILES)
       }
     }
 
     // Player
-    this.player = this.add.circle(CANVAS_WIDTH / 2, CANVAS_HEIGHT / 2, RECTANGLE_SIZE / 3, 0xDC143C, 1)
+    this.player = this.add.circle(CANVAS_WIDTH / 2, CANVAS_HEIGHT / 2, TILE_SIZE / 3, 0xDC143C, 1)
     this.player.setStrokeStyle(2, 0x000000, 1)
     this.player.setDepth(DEPTHS.PLAYER)
     this.physics.add.existing(this.player)
 
     // Tree
-    this.tree = this.add.image(TREE_POSITION.x * RECTANGLE_SIZE, TREE_POSITION.y * RECTANGLE_SIZE, "tree")
+    this.tree = this.add.image(TREE_POSITION.x * TILE_SIZE, TREE_POSITION.y * TILE_SIZE, "tree")
     .setOrigin(0, 0)
-    .setDepth(DEPTHS.BLOCKONTOP)
-    .setDisplaySize(RECTANGLE_SIZE, RECTANGLE_SIZE)
+    .setDepth(DEPTHS.BLOCKS)
+    .setDisplaySize(TILE_SIZE, TILE_SIZE)
     this.textures.get("tree").setFilter(Phaser.Textures.FilterMode.NEAREST);
     this.physics.add.existing(this.tree, true)
 
@@ -153,7 +153,7 @@ class GameScene extends Phaser.Scene {
 
     // Collision
     this.player.body.setCollideWorldBounds(true)
-    this.physics.add.collider(this.player, this.blockGroup)
+    this.physics.add.collider(this.player, this.tileGroup)
     this.physics.add.collider(this.player, this.tree)
 
   }
