@@ -51,10 +51,10 @@ class GameScene extends Phaser.Scene {
       RECTANGLE_SIZE,
       0x000000,
       0
-    ).setOrigin(0,0)
-    .setStrokeStyle(2, 0xff0000, 1)
-    .setDepth(DEPTHS.HOVER)
-    .setVisible(false)
+    ).setOrigin(0, 0)
+      .setStrokeStyle(2, 0xff0000, 1)
+      .setDepth(DEPTHS.HOVER)
+      .setVisible(false)
 
     this.physics.add.existing(this.hoverBox, true)
 
@@ -64,13 +64,13 @@ class GameScene extends Phaser.Scene {
         const color = map[i][j] ? 0x77DD77 : 0x4f92d4
 
         const rect = this.add.rectangle(
-          i * RECTANGLE_SIZE, 
-          j * RECTANGLE_SIZE, 
+          i * RECTANGLE_SIZE,
+          j * RECTANGLE_SIZE,
           RECTANGLE_SIZE,
           RECTANGLE_SIZE,
           color,
           1
-        ).setOrigin(0,0)
+        ).setOrigin(0, 0)
 
         rect.setStrokeStyle(1, 0x444444, 1)
 
@@ -84,35 +84,35 @@ class GameScene extends Phaser.Scene {
         rect.setInteractive()
 
         rect.on("pointerdown", (pointer) => {
-            if (pointer.leftButtonDown()) {
-              if (rect.getData(RECT_DATA.BLOCK_ON_TOP) || this.isHoverOnPlayer) {
-                return
-              }
+          if (pointer.leftButtonDown()) {
+            if (rect.getData(RECT_DATA.BLOCK_ON_TOP) || this.isHoverOnPlayer) {
+              return
+            }
 
-              const blockOnTop = this.add.rectangle(
-                rect.x,
-                rect.y,
-                RECTANGLE_SIZE,
-                RECTANGLE_SIZE,
-                0x895129,
-                1
-              ).setOrigin(0,0)
+            const blockOnTop = this.add.rectangle(
+              rect.x,
+              rect.y,
+              RECTANGLE_SIZE,
+              RECTANGLE_SIZE,
+              0x895129,
+              1
+            ).setOrigin(0, 0)
               .setDepth(DEPTHS.BLOCKONTOP)
 
-              rect.setData(RECT_DATA.BLOCK_ON_TOP, blockOnTop)
+            rect.setData(RECT_DATA.BLOCK_ON_TOP, blockOnTop)
 
-              this.physics.add.existing(blockOnTop, true)
-              this.blockGroup.add(blockOnTop)
-            }
-            else if (pointer.rightButtonDown()) {
-              const blockOnTop = rect.getData(RECT_DATA.BLOCK_ON_TOP)
+            this.physics.add.existing(blockOnTop, true)
+            this.blockGroup.add(blockOnTop)
+          }
+          else if (pointer.rightButtonDown()) {
+            const blockOnTop = rect.getData(RECT_DATA.BLOCK_ON_TOP)
 
-              if (blockOnTop) {
-                blockOnTop.destroy()
-                rect.setData(RECT_DATA.BLOCK_ON_TOP, null)
-              }
+            if (blockOnTop) {
+              blockOnTop.destroy()
+              rect.setData(RECT_DATA.BLOCK_ON_TOP, null)
             }
           }
+        }
         )
 
         rect.on("pointerover", () => {
@@ -146,7 +146,7 @@ class GameScene extends Phaser.Scene {
   }
 
   update() {
-    const {up, down, left, right} = this.inputs
+    const { up, down, left, right } = this.inputs
 
     let velocityX = 0;
     let velocityY = 0;
@@ -155,8 +155,8 @@ class GameScene extends Phaser.Scene {
       velocityX = -1
     } else if (right.isDown) {
       velocityX = 1
-    } 
-    
+    }
+
     if (up.isDown) {
       velocityY = -1
     } else if (down.isDown) {
@@ -164,8 +164,8 @@ class GameScene extends Phaser.Scene {
     }
 
     const vec = new Phaser.Math.Vector2(velocityX, velocityY)
-    .normalize()
-    .scale(PLAYER_SPEED)
+      .normalize()
+      .scale(PLAYER_SPEED)
 
     this.player.body.setVelocity(vec.x, vec.y);
 
