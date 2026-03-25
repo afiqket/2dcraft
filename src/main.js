@@ -27,7 +27,7 @@ const map = [
   [0, 0, 1, 0, 0]
 ]
 
-const TREE_POSITION = {x: 1, y: 1}
+const TREE_POSITION = { x: 1, y: 1 }
 
 class GameScene extends Phaser.Scene {
   constructor() {
@@ -38,16 +38,18 @@ class GameScene extends Phaser.Scene {
     this.hoverBox;
     this.isInvalidPlacement = false;
     this.tree;
+    this.emitter;
   }
 
   preload() {
     this.load.image("tree", "./assets/tree.png")
+    this.load.image("tree_particle", "./assets/tree_particle.png")
   }
 
   create() {
     // Disable normal right click
     this.input.mouse.disableContextMenu();
-    
+
     // Red outline box when a tile is hovered 
     this.hoverBox = this.add.rectangle(
       0,
@@ -57,9 +59,9 @@ class GameScene extends Phaser.Scene {
       0x000000,
       0
     ).setOrigin(0, 0)
-    .setStrokeStyle(2, 0xff0000, 1)
-    .setDepth(DEPTHS.HOVER)
-    .setVisible(false)
+      .setStrokeStyle(2, 0xff0000, 1)
+      .setDepth(DEPTHS.HOVER)
+      .setVisible(false)
 
     this.physics.add.existing(this.hoverBox, true)
 
@@ -91,7 +93,7 @@ class GameScene extends Phaser.Scene {
         tile.setInteractive()
 
         tile.on("pointerdown", (pointer) => {
-          if (pointer.leftButtonDown()) {
+          if (pointer.rightButtonDown()) {
             if (tile.getData(TILE_DATA.BLOCK) || this.isInvalidPlacement) {
               return
             }
@@ -111,7 +113,7 @@ class GameScene extends Phaser.Scene {
             this.physics.add.existing(block, true)
             this.tileGroup.add(block)
           }
-          else if (pointer.rightButtonDown()) {
+          else if (pointer.leftButtonDown()) {
             const block = tile.getData(TILE_DATA.BLOCK)
 
             if (block) {
@@ -144,17 +146,40 @@ class GameScene extends Phaser.Scene {
 
     // Tree
     this.tree = this.add.image(TREE_POSITION.x * TILE_SIZE, TREE_POSITION.y * TILE_SIZE, "tree")
-    .setOrigin(0, 0)
-    .setDepth(DEPTHS.BLOCKS)
-    .setDisplaySize(TILE_SIZE, TILE_SIZE)
+      .setOrigin(0, 0)
+      .setDepth(DEPTHS.BLOCKS)
+      .setDisplaySize(TILE_SIZE, TILE_SIZE)
     this.textures.get("tree").setFilter(Phaser.Textures.FilterMode.NEAREST);
     this.physics.add.existing(this.tree, true)
     this.tree.setData(TREE_DATA.HEALTH, 3)
     this.tree.setInteractive()
     this.tree.on("pointerdown", (pointer) => {
       const treeHealth = this.tree.setData(TREE_DATA.HEALTH, this.tree.getData(TREE_DATA.HEALTH) - 1)
-      }
+      this.emitter.start()
+
+      const tree_x = this.tree.x
+      this.tweens.add({
+        targets: this.tree,
+        x: tree_x + 4,
+        duration: 40,
+        yoyo: true,
+        repeat: 2,
+        onComplete: () => {
+          this.tree.x = tree_x;
+        }
+      })
+    }
     )
+
+    // Effects
+    this.emitter = this.add.particles(this.tree.x + TILE_SIZE / 2, this.tree.y + TILE_SIZE / 2, "tree_particle", {
+      speed: 300,
+      lifespan: 150,
+      gravityY: 1000,
+      scale: 1,
+      duration: 100,
+      emitting: false
+    }).setDepth(DEPTHS.PLAYER)
 
     // Controls
     /** @type {Phaser.Types.Input.Keyboard.CursorKeys} */
