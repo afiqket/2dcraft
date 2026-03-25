@@ -11,6 +11,11 @@ const DEPTHS = {
   BLOCKONTOP: 20,
   PLAYER: 30
 }
+const RECT_DATA = {
+  BLOCK_TYPE: "blockType",
+  HOVER_BOX: "hoverBox",
+  BLOCK_ON_TOP: "blockOnTop"
+}
 
 const map = [
   [0, 0, 1, 0, 0],
@@ -59,21 +64,20 @@ class GameScene extends Phaser.Scene {
 
         this.physics.add.existing(rect, true)
 
-        // JS shenanigans. Can just create a new attribute
-        rect.blockType = blockType
-        rect.hoverBox = null
-        rect.blockOnTop = null
+        rect.setData(RECT_DATA.BLOCK_TYPE, blockType)
+        rect.setData(RECT_DATA.BLOCK_ON_TOP, null)
+        rect.setData(RECT_DATA.HOVER_BOX, null)
 
         // Required for mouse click events
         rect.setInteractive()
 
         rect.on("pointerdown", (pointer) => {
             if (pointer.leftButtonDown()) {
-              if (rect.blockOnTop || this.isHoverOnPlayer) {
+              if (rect.getData(RECT_DATA.BLOCK_ON_TOP) || this.isHoverOnPlayer) {
                 return
               }
 
-              rect.blockOnTop = this.add.rectangle(
+              const blockOnTop = this.add.rectangle(
                 rect.x,
                 rect.y,
                 RECTANGLE_SIZE,
@@ -83,13 +87,17 @@ class GameScene extends Phaser.Scene {
               ).setOrigin(0,0)
               .setDepth(DEPTHS.BLOCKONTOP)
 
-              this.physics.add.existing(rect.blockOnTop, true)
-              this.blockGroup.add(rect.blockOnTop)
+              rect.setData(RECT_DATA.BLOCK_ON_TOP, blockOnTop)
+
+              this.physics.add.existing(blockOnTop, true)
+              this.blockGroup.add(blockOnTop)
             }
             else if (pointer.rightButtonDown()) {
-              if (rect.blockOnTop) {
-                rect.blockOnTop.destroy()
-                rect.blockOnTop = null
+              const blockOnTop = rect.getData(RECT_DATA.BLOCK_ON_TOP)
+
+              if (blockOnTop) {
+                blockOnTop.destroy()
+                rect.setData(RECT_DATA.BLOCK_ON_TOP, null)
               }
             }
           }
