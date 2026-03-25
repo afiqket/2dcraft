@@ -15,6 +15,9 @@ const TILE_DATA = {
   TILE_TYPE: "TILE_TYPE",
   BLOCK: "BLOCK"
 }
+const TREE_DATA = {
+  HEALTH: "HEALTH"
+}
 
 const map = [
   [1, 1, 1, 0, 0],
@@ -33,7 +36,7 @@ class GameScene extends Phaser.Scene {
     this.inputs;
     this.tileGroup;
     this.hoverBox;
-    this.isHoverOnPlayer = false;
+    this.isInvalidPlacement = false;
     this.tree;
   }
 
@@ -89,7 +92,7 @@ class GameScene extends Phaser.Scene {
 
         tile.on("pointerdown", (pointer) => {
           if (pointer.leftButtonDown()) {
-            if (tile.getData(TILE_DATA.BLOCK) || this.isHoverOnPlayer) {
+            if (tile.getData(TILE_DATA.BLOCK) || this.isInvalidPlacement) {
               return
             }
 
@@ -146,6 +149,12 @@ class GameScene extends Phaser.Scene {
     .setDisplaySize(TILE_SIZE, TILE_SIZE)
     this.textures.get("tree").setFilter(Phaser.Textures.FilterMode.NEAREST);
     this.physics.add.existing(this.tree, true)
+    this.tree.setData(TREE_DATA.HEALTH, 3)
+    this.tree.setInteractive()
+    this.tree.on("pointerdown", (pointer) => {
+      const treeHealth = this.tree.setData(TREE_DATA.HEALTH, this.tree.getData(TREE_DATA.HEALTH) - 1)
+      }
+    )
 
     // Controls
     /** @type {Phaser.Types.Input.Keyboard.CursorKeys} */
@@ -182,10 +191,14 @@ class GameScene extends Phaser.Scene {
 
     this.player.body.setVelocity(vec.x, vec.y);
 
-    if (this.physics.overlap(this.player, this.hoverBox)) {
-      this.isHoverOnPlayer = true
+    if (this.physics.overlap(this.player, this.hoverBox) || this.physics.overlap(this.tree, this.hoverBox)) {
+      this.isInvalidPlacement = true
     } else {
-      this.isHoverOnPlayer = false
+      this.isInvalidPlacement = false
+    }
+
+    if (this.tree.getData(TREE_DATA.HEALTH) <= 0) {
+      this.tree.destroy()
     }
   }
 }
