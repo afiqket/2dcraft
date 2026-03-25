@@ -39,6 +39,7 @@ class GameScene extends Phaser.Scene {
     this.isInvalidPlacement = false;
     this.tree;
     this.emitter;
+    this.inventoryText;
   }
 
   preload() {
@@ -180,6 +181,12 @@ class GameScene extends Phaser.Scene {
       duration: 100,
       emitting: false
     }).setDepth(DEPTHS.PLAYER)
+    
+    // Text (Inventory)
+    this.inventoryText = this.add.text(20, CANVAS_HEIGHT - 40, "WOOD: 0", {
+        font: "25px Monospace",
+        fill: "#000000"
+      })
 
     // Controls
     /** @type {Phaser.Types.Input.Keyboard.CursorKeys} */
