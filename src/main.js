@@ -3,7 +3,7 @@ import Phaser from "phaser"
 
 const CANVAS_WIDTH = 500
 const CANVAS_HEIGHT = 500
-const TILE_SIZE = 50
+const TILE_SIZE = 100
 const PLAYER_SIZE = TILE_SIZE / 3
 const PLAYER_SPEED = 200
 const DEPTHS = {
@@ -55,11 +55,49 @@ class GameScene extends Phaser.Scene {
     this.emitter;
     this.inventoryText;
     this.inventoryWoodCount = 0;
+    this.treeGroup
   }
 
   preload() {
     this.load.image("tree", "./assets/tree.png")
     this.load.image("tree_particle", "./assets/tree_particle.png")
+  }
+
+  addTree(x, y) {
+    // Tree
+    const treeWorld = gridToWorld(x, y)
+    const tree = this.add.image(treeWorld.x, treeWorld.y, "tree")
+      .setDepth(DEPTHS.BLOCKS)
+      .setDisplaySize(TILE_SIZE, TILE_SIZE)
+    this.textures.get("tree").setFilter(Phaser.Textures.FilterMode.NEAREST);
+    tree.setData(TREE_DATA.HEALTH, 3)
+    tree.setInteractive()
+    tree.on("pointerdown", (pointer) => {
+      const treeHealth = tree.getData(TREE_DATA.HEALTH) - 1
+      tree.setData(TREE_DATA.HEALTH, treeHealth)
+      this.emitter.startFollow(tree)
+      this.emitter.start()
+      
+      // Shake tree
+      this.tweens.add({
+        targets: tree,
+        x: treeWorld.x + 4,
+        duration: 40,
+        yoyo: true,
+        repeat: 2,
+        onComplete: () => {
+          tree.x = treeWorld.x;
+        }
+      })
+
+      if (treeHealth <= 0) {
+        tree.destroy()
+        this.inventoryWoodCount += 5
+        this.inventoryText.setText(`WOOD: ${this.inventoryWoodCount}`)
+      }
+    }
+    )
+    this.treeGroup.add(tree)
   }
 
   create() {
@@ -89,6 +127,9 @@ class GameScene extends Phaser.Scene {
 
     this.physics.add.existing(this.hoverBox, true)
 
+    // Tree grouo
+    this.treeGroup = this.physics.add.staticGroup();
+
     // Blocks on the ground
     this.tileGroup = this.physics.add.staticGroup();
     for (let row = 0; row < map.length; row++) {
@@ -113,7 +154,7 @@ class GameScene extends Phaser.Scene {
             // Tree
             tileType = "grass"
             color = 0x77DD77
-            TREE_POSITION = { x: col, y: row }
+            this.addTree(col, row)
             break;
 
           case 3:
@@ -206,36 +247,10 @@ class GameScene extends Phaser.Scene {
     this.player.setDepth(DEPTHS.PLAYER)
     this.physics.add.existing(this.player)
 
-    // Tree
-    const treeWorld = gridToWorld(TREE_POSITION.x, TREE_POSITION.y)
-    this.tree = this.add.image(treeWorld.x, treeWorld.y, "tree")
-      .setDepth(DEPTHS.BLOCKS)
-      .setDisplaySize(TILE_SIZE, TILE_SIZE)
-    this.textures.get("tree").setFilter(Phaser.Textures.FilterMode.NEAREST);
-    this.physics.add.existing(this.tree, true)
-    this.tree.setData(TREE_DATA.HEALTH, 3)
-    this.tree.setInteractive()
-    this.tree.on("pointerdown", (pointer) => {
-      const treeHealth = this.tree.setData(TREE_DATA.HEALTH, this.tree.getData(TREE_DATA.HEALTH) - 1)
-      this.emitter.start()
 
-      // Shake tree
-      const tree_x = this.tree.x
-      this.tweens.add({
-        targets: this.tree,
-        x: tree_x + 4,
-        duration: 40,
-        yoyo: true,
-        repeat: 2,
-        onComplete: () => {
-          this.tree.x = tree_x;
-        }
-      })
-    }
-    )
 
     // Effects
-    this.emitter = this.add.particles(this.tree.x + TILE_SIZE / 2, this.tree.y + TILE_SIZE / 2, "tree_particle", {
+    this.emitter = this.add.particles(0, 0, "tree_particle", {
       speed: 300,
       lifespan: 150,
       gravityY: 1000,
@@ -295,17 +310,17 @@ class GameScene extends Phaser.Scene {
 
     this.player.body.setVelocity(vec.x, vec.y);
 
-    if (this.physics.overlap(this.player, this.hoverBox) || this.physics.overlap(this.tree, this.hoverBox)) {
+    if (this.physics.overlap(this.player, this.hoverBox) || this.physics.overlap(this.treeGroup, this.hoverBox)) {
       this.isInvalidPlacement = true
     } else {
       this.isInvalidPlacement = false
     }
 
-    if (this.tree.getData(TREE_DATA.HEALTH) <= 0) {
-      this.tree.destroy()
-      this.inventoryWoodCount += 5
-      this.inventoryText.setText(`WOOD: ${this.inventoryWoodCount}`)
-    }
+    // if (this.tree.getData(TREE_DATA.HEALTH) <= 0) {
+    //   this.tree.destroy()
+    //   this.inventoryWoodCount += 5
+    //   this.inventoryText.setText(`WOOD: ${this.inventoryWoodCount}`)
+    // }
   }
 }
 
