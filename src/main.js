@@ -3,14 +3,15 @@ import Phaser from "phaser"
 
 const CANVAS_WIDTH = 500
 const CANVAS_HEIGHT = 500
-const TILE_SIZE = 100
+const TILE_SIZE = 50
 const PLAYER_SIZE = TILE_SIZE / 3
 const PLAYER_SPEED = 200
 const DEPTHS = {
   TILES: 0,
   BLOCKS: 10,
   HOVER: 20,
-  PLAYER: 30
+  PLAYER: 30,
+  TEXT: 100
 }
 const TILE_DATA = {
   TILE_TYPE: "TILE_TYPE",
@@ -20,20 +21,20 @@ const TREE_DATA = {
   HEALTH: "HEALTH"
 }
 
-const map = [
-  [1, 1, 1, 0, 0, 0, 0],
-  [1, 2, 2, 1, 1, 1, 0],
-  [1, 2, 2, 1, 1, 1, 1],
-  [0, 1, 1, 3, 1, 1, 0],
-  [0, 0, 1, 1, 1, 0, 0],
-  [0, 0, 1, 1, 0, 0, 0],
-  [0, 0, 1, 0, 0, 0, 0],
-]
+// Map pixel color to tile id
+const PIXEL_TO_TILE = {
+  0x41A6F6: 0,
+  0xA7F070: 1,
+  0x257179: 2,
+  0xB13E53: 3
+}
 
-const MAP_WIDTH = map[0].length * TILE_SIZE
-const MAP_HEIGHT = map.length * TILE_SIZE
+// This will be filled from map.png
+let map = []
 
-let TREE_POSITION
+let MAP_WIDTH = 0
+let MAP_HEIGHT = 0
+
 let PLAYER_POSITION
 
 function gridToWorld(x, y) {
@@ -51,7 +52,6 @@ class GameScene extends Phaser.Scene {
     this.tileGroup;
     this.hoverBox;
     this.isInvalidPlacement = false;
-    this.tree;
     this.emitter;
     this.inventoryText;
     this.inventoryWoodCount = 0;
@@ -61,6 +61,48 @@ class GameScene extends Phaser.Scene {
   preload() {
     this.load.image("tree", "./assets/tree.png")
     this.load.image("tree_particle", "./assets/tree_particle.png")
+    this.load.image("map", "./assets/map.png")
+  }
+
+  buildMapFromImage(textureKey) {
+    const sourceImage = this.textures.get(textureKey).getSourceImage()
+
+    const canvas = document.createElement("canvas")
+    canvas.width = sourceImage.width
+    canvas.height = sourceImage.height
+
+    const ctx = canvas.getContext("2d", { willReadFrequently: true })
+    ctx.drawImage(sourceImage, 0, 0)
+
+    const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height).data
+    const result = []
+
+    for (let y = 0; y < canvas.height; y++) {
+      const row = []
+
+      for (let x = 0; x < canvas.width; x++) {
+        const index = (y * canvas.width + x) * 4
+
+        const r = imageData[index]
+        const g = imageData[index + 1]
+        const b = imageData[index + 2]
+
+        const hex = (r << 16) | (g << 8) | b
+        const tileId = PIXEL_TO_TILE[hex]
+
+        if (tileId === undefined) {
+          throw new Error(
+            `Unknown map color at (${x}, ${y}): 0x${hex.toString(16).toUpperCase().padStart(6, "0")}`
+          )
+        }
+
+        row.push(tileId)
+      }
+
+      result.push(row)
+    }
+
+    return result
   }
 
   addTree(x, y) {
@@ -92,7 +134,7 @@ class GameScene extends Phaser.Scene {
 
       if (treeHealth <= 0) {
         tree.destroy()
-        this.inventoryWoodCount += 5
+        this.inventoryWoodCount += 2
         this.inventoryText.setText(`WOOD: ${this.inventoryWoodCount}`)
       }
     }
@@ -101,6 +143,11 @@ class GameScene extends Phaser.Scene {
   }
 
   create() {
+    // Build map from map.png
+    map = this.buildMapFromImage("map")
+    MAP_WIDTH = map[0].length * TILE_SIZE
+    MAP_HEIGHT = map.length * TILE_SIZE
+
     // Disable normal right click
     this.input.mouse.disableContextMenu();
 
@@ -127,7 +174,7 @@ class GameScene extends Phaser.Scene {
 
     this.physics.add.existing(this.hoverBox, true)
 
-    // Tree grouo
+    // Tree group
     this.treeGroup = this.physics.add.staticGroup();
 
     // Blocks on the ground
@@ -136,6 +183,8 @@ class GameScene extends Phaser.Scene {
       for (let col = 0; col < map[row].length; col++) {
         const tileId = map[row][col]
         let tileType
+  //         0x41A6F6: 0,
+  // 0xA7F070: 1,
         let color
         switch (tileId) {
           case 0:
@@ -264,6 +313,7 @@ class GameScene extends Phaser.Scene {
       font: "25px Monospace",
       fill: "#000000"
     }).setScrollFactor(0) // Set dont move with camera
+    .setDepth(DEPTHS.TEXT)
 
     // Controls
     /** @type {Phaser.Types.Input.Keyboard.CursorKeys} */
@@ -272,7 +322,7 @@ class GameScene extends Phaser.Scene {
     // Collision
     this.player.body.setCollideWorldBounds(true)
     this.physics.add.collider(this.player, this.tileGroup)
-    this.physics.add.collider(this.player, this.tree)
+    this.physics.add.collider(this.player, this.treeGroup)
 
     // Camera
     this.cameras.main.setBounds(
