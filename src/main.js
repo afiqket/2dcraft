@@ -3,7 +3,8 @@ import Phaser from "phaser"
 
 const CANVAS_WIDTH = 500
 const CANVAS_HEIGHT = 500
-const TILE_SIZE = 100
+const TILE_SIZE = 50
+const PLAYER_SIZE = TILE_SIZE / 3
 const PLAYER_SPEED = 200
 const DEPTHS = {
   TILES: 0,
@@ -20,14 +21,20 @@ const TREE_DATA = {
 }
 
 const map = [
-  [1, 1, 1, 0, 0],
-  [1, 1, 1, 1, 0],
-  [1, 1, 1, 1, 1],
-  [0, 1, 1, 1, 0],
-  [0, 0, 1, 0, 0]
+  [1, 1, 1, 0, 0, 0, 0],
+  [1, 1, 1, 1, 1, 1, 0],
+  [1, 1, 1, 1, 1, 1, 1],
+  [0, 1, 1, 1, 1, 1, 0],
+  [0, 0, 1, 1, 1, 0, 0],
+  [0, 0, 1, 1, 0, 0, 0],
+  [0, 0, 1, 0, 0, 0, 0],
 ]
 
+const MAP_WIDTH = map[0].length * TILE_SIZE
+const MAP_HEIGHT = map.length * TILE_SIZE
+
 const TREE_POSITION = { x: 1, y: 1 }
+const PLAYER_POSITION = { x: 3, y: 2 }
 
 function gridToWorld(x, y) {
   return {
@@ -59,6 +66,14 @@ class GameScene extends Phaser.Scene {
     // Disable normal right click
     this.input.mouse.disableContextMenu();
 
+    // Map bounds
+    this.physics.world.setBounds(
+      -TILE_SIZE / 2, 
+      -TILE_SIZE / 2, 
+      MAP_WIDTH,
+      MAP_HEIGHT
+    )
+
     // Red outline box when a tile is hovered 
     this.hoverBox = this.add.rectangle(
       0,
@@ -67,7 +82,7 @@ class GameScene extends Phaser.Scene {
       TILE_SIZE,
       0x000000,
       0
-    ).setOrigin(0, 0)
+    )
       .setStrokeStyle(2, 0xff0000, 1)
       .setDepth(DEPTHS.HOVER)
       .setVisible(false)
@@ -81,7 +96,7 @@ class GameScene extends Phaser.Scene {
         const tileType = map[row][col] ? "grass" : "water"
         const color = map[row][col] ? 0x77DD77 : 0x4f92d4
 
-        const {x, y} = gridToWorld(col, row)
+        const { x, y } = gridToWorld(col, row)
 
         const tile = this.add.rectangle(
           x,
@@ -90,7 +105,7 @@ class GameScene extends Phaser.Scene {
           TILE_SIZE,
           color,
           1
-        ).setOrigin(0, 0)
+        )
 
         tile.setStrokeStyle(1, 0x444444, 1)
 
@@ -116,8 +131,7 @@ class GameScene extends Phaser.Scene {
               TILE_SIZE,
               0x895129,
               1
-            ).setOrigin(0, 0)
-              .setDepth(DEPTHS.BLOCKS)
+            ).setDepth(DEPTHS.BLOCKS)
 
             tile.setData(TILE_DATA.BLOCK, block)
 
@@ -155,7 +169,8 @@ class GameScene extends Phaser.Scene {
     }
 
     // Player
-    this.player = this.add.circle(CANVAS_WIDTH / 2, CANVAS_HEIGHT / 2, TILE_SIZE / 3, 0xDC143C, 1)
+    const playerWorld = gridToWorld(PLAYER_POSITION.x, PLAYER_POSITION.y)
+    this.player = this.add.circle(playerWorld.x, playerWorld.y, PLAYER_SIZE, 0xDC143C, 1)
     this.player.setStrokeStyle(2, 0x000000, 1)
     this.player.setDepth(DEPTHS.PLAYER)
     this.physics.add.existing(this.player)
@@ -163,7 +178,6 @@ class GameScene extends Phaser.Scene {
     // Tree
     const treeWorld = gridToWorld(TREE_POSITION.x, TREE_POSITION.y)
     this.tree = this.add.image(treeWorld.x, treeWorld.y, "tree")
-      .setOrigin(0, 0)
       .setDepth(DEPTHS.BLOCKS)
       .setDisplaySize(TILE_SIZE, TILE_SIZE)
     this.textures.get("tree").setFilter(Phaser.Textures.FilterMode.NEAREST);
@@ -174,6 +188,7 @@ class GameScene extends Phaser.Scene {
       const treeHealth = this.tree.setData(TREE_DATA.HEALTH, this.tree.getData(TREE_DATA.HEALTH) - 1)
       this.emitter.start()
 
+      // Shake tree
       const tree_x = this.tree.x
       this.tweens.add({
         targets: this.tree,
@@ -202,7 +217,7 @@ class GameScene extends Phaser.Scene {
     this.inventoryText = this.add.text(20, CANVAS_HEIGHT - 40, "WOOD: 0", {
       font: "25px Monospace",
       fill: "#000000"
-    })
+    }).setScrollFactor(0) // Set dont move with camera
 
     // Controls
     /** @type {Phaser.Types.Input.Keyboard.CursorKeys} */
@@ -212,6 +227,16 @@ class GameScene extends Phaser.Scene {
     this.player.body.setCollideWorldBounds(true)
     this.physics.add.collider(this.player, this.tileGroup)
     this.physics.add.collider(this.player, this.tree)
+
+    // Camera
+    this.cameras.main.setBounds(
+      -TILE_SIZE / 2, 
+      -TILE_SIZE / 2, 
+      MAP_WIDTH, 
+      MAP_HEIGHT
+    )
+    this.cameras.main.startFollow(this.player, true)
+    this.cameras.main.setZoom(1)
 
   }
 
