@@ -22,9 +22,9 @@ const TREE_DATA = {
 
 const map = [
   [1, 1, 1, 0, 0, 0, 0],
-  [1, 1, 1, 1, 1, 1, 0],
-  [1, 1, 1, 1, 1, 1, 1],
-  [0, 1, 1, 1, 1, 1, 0],
+  [1, 2, 2, 1, 1, 1, 0],
+  [1, 2, 2, 1, 1, 1, 1],
+  [0, 1, 1, 3, 1, 1, 0],
   [0, 0, 1, 1, 1, 0, 0],
   [0, 0, 1, 1, 0, 0, 0],
   [0, 0, 1, 0, 0, 0, 0],
@@ -33,8 +33,8 @@ const map = [
 const MAP_WIDTH = map[0].length * TILE_SIZE
 const MAP_HEIGHT = map.length * TILE_SIZE
 
-const TREE_POSITION = { x: 1, y: 1 }
-const PLAYER_POSITION = { x: 3, y: 2 }
+let TREE_POSITION
+let PLAYER_POSITION
 
 function gridToWorld(x, y) {
   return {
@@ -68,8 +68,8 @@ class GameScene extends Phaser.Scene {
 
     // Map bounds
     this.physics.world.setBounds(
-      -TILE_SIZE / 2, 
-      -TILE_SIZE / 2, 
+      -TILE_SIZE / 2,
+      -TILE_SIZE / 2,
       MAP_WIDTH,
       MAP_HEIGHT
     )
@@ -93,8 +93,39 @@ class GameScene extends Phaser.Scene {
     this.tileGroup = this.physics.add.staticGroup();
     for (let row = 0; row < map.length; row++) {
       for (let col = 0; col < map[row].length; col++) {
-        const tileType = map[row][col] ? "grass" : "water"
-        const color = map[row][col] ? 0x77DD77 : 0x4f92d4
+        const tileId = map[row][col]
+        let tileType
+        let color
+        switch (tileId) {
+          case 0:
+            // Water
+            tileType = "water"
+            color = 0x4f92d4
+            break;
+
+          case 1:
+            // Gras
+            tileType = "grass"
+            color = 0x77DD77
+            break;
+
+          case 2:
+            // Tree
+            tileType = "grass"
+            color = 0x77DD77
+            TREE_POSITION = { x: col, y: row }
+            break;
+
+          case 3:
+            // Player
+            tileType = "grass"
+            color = 0x77DD77
+            PLAYER_POSITION = { x: col, y: row }
+            break;
+
+          default:
+            break;
+        }
 
         const { x, y } = gridToWorld(col, row)
 
@@ -230,9 +261,9 @@ class GameScene extends Phaser.Scene {
 
     // Camera
     this.cameras.main.setBounds(
-      -TILE_SIZE / 2, 
-      -TILE_SIZE / 2, 
-      MAP_WIDTH, 
+      -TILE_SIZE / 2,
+      -TILE_SIZE / 2,
+      MAP_WIDTH,
       MAP_HEIGHT
     )
     this.cameras.main.startFollow(this.player, true)
