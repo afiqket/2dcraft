@@ -29,6 +29,13 @@ const map = [
 
 const TREE_POSITION = { x: 1, y: 1 }
 
+function gridToWorld(x, y) {
+  return {
+    x: x * TILE_SIZE,
+    y: y * TILE_SIZE
+  }
+}
+
 class GameScene extends Phaser.Scene {
   constructor() {
     super("scene-game");
@@ -69,14 +76,16 @@ class GameScene extends Phaser.Scene {
 
     // Blocks on the ground
     this.tileGroup = this.physics.add.staticGroup();
-    for (let i = 0; i < map.length; i++) {
-      for (let j = 0; j < map[i].length; j++) {
-        const tileType = map[j][i] ? "grass" : "water"
-        const color = map[j][i] ? 0x77DD77 : 0x4f92d4
+    for (let row = 0; row < map.length; row++) {
+      for (let col = 0; col < map[row].length; col++) {
+        const tileType = map[row][col] ? "grass" : "water"
+        const color = map[row][col] ? 0x77DD77 : 0x4f92d4
+
+        const {x, y} = gridToWorld(col, row)
 
         const tile = this.add.rectangle(
-          i * TILE_SIZE,
-          j * TILE_SIZE,
+          x,
+          y,
           TILE_SIZE,
           TILE_SIZE,
           color,
@@ -152,7 +161,8 @@ class GameScene extends Phaser.Scene {
     this.physics.add.existing(this.player)
 
     // Tree
-    this.tree = this.add.image(TREE_POSITION.x * TILE_SIZE, TREE_POSITION.y * TILE_SIZE, "tree")
+    const treeWorld = gridToWorld(TREE_POSITION.x, TREE_POSITION.y)
+    this.tree = this.add.image(treeWorld.x, treeWorld.y, "tree")
       .setOrigin(0, 0)
       .setDepth(DEPTHS.BLOCKS)
       .setDisplaySize(TILE_SIZE, TILE_SIZE)
