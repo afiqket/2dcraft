@@ -6,7 +6,7 @@ let game
 const CANVAS_WIDTH = 500
 const CANVAS_HEIGHT = 500
 const TILE_SIZE = 50
-const PLAYER_SIZE = TILE_SIZE / 3
+const CIRCLE_SIZE = TILE_SIZE / 3
 const PLAYER_SPEED = 200
 const DEPTHS = {
   TILES: 0,
@@ -144,6 +144,8 @@ class GameScene extends Phaser.Scene {
     tree.setData(TREE_DATA.HEALTH, 3)
     tree.setInteractive()
     tree.on("pointerdown", (pointer) => {
+      if (pointer.rightButtonDown()) 
+        {return}
       const treeHealth = tree.getData(TREE_DATA.HEALTH) - 1
       tree.setData(TREE_DATA.HEALTH, treeHealth)
       
@@ -157,6 +159,15 @@ class GameScene extends Phaser.Scene {
     }
     )
     this.treeGroup.add(tree)
+  }
+
+  addMonster(x, y) {
+    const monsterWorldPos = gridToWorld(x, y)
+    const monster = this.add.circle(monsterWorldPos.x, monsterWorldPos.y, CIRCLE_SIZE, 0xDC143C, 1)
+    monster.setStrokeStyle(2, 0x000000, 1)
+    monster.setDepth(DEPTHS.PLAYER)
+    this.physics.add.existing(monster)
+    this.monsterGroup.add(monster)
   }
 
   create() {
@@ -191,11 +202,12 @@ class GameScene extends Phaser.Scene {
 
     this.physics.add.existing(this.hoverBox, true)
 
-    // Tree group
+    // Groups
     this.treeGroup = this.physics.add.staticGroup();
+    this.tileGroup = this.physics.add.staticGroup();
+    this.monsterGroup = this.physics.add.group()
 
     // Convert map.png to game map data
-    this.tileGroup = this.physics.add.staticGroup();
     for (let row = 0; row < map.length; row++) {
       for (let col = 0; col < map[row].length; col++) {
         const tileId = map[row][col]
@@ -229,6 +241,10 @@ class GameScene extends Phaser.Scene {
             break;
 
           case 4:
+            // Monster
+            tileType = "grass"
+            color = 0x77DD77
+            this.addMonster(col, row)
             break;
 
           default:
@@ -311,7 +327,7 @@ class GameScene extends Phaser.Scene {
 
     // Player
     const playerWorld = gridToWorld(PLAYER_POSITION.x, PLAYER_POSITION.y)
-    this.player = this.add.circle(playerWorld.x, playerWorld.y, PLAYER_SIZE, 0x2b3faf, 1)
+    this.player = this.add.circle(playerWorld.x, playerWorld.y, CIRCLE_SIZE, 0x2b3faf, 1)
     this.player.setStrokeStyle(2, 0x000000, 1)
     this.player.setDepth(DEPTHS.PLAYER)
     this.physics.add.existing(this.player)
@@ -386,7 +402,9 @@ class GameScene extends Phaser.Scene {
 
     this.player.body.setVelocity(vec.x, vec.y);
 
-    if (this.physics.overlap(this.player, this.hoverBox) || this.physics.overlap(this.treeGroup, this.hoverBox)) {
+    if (this.physics.overlap(this.player, this.hoverBox) 
+      || this.physics.overlap(this.treeGroup, this.hoverBox)
+      || this.physics.overlap(this.monsterGroup, this.hoverBox)) {
       this.isInvalidPlacement = true
     } else {
       this.isInvalidPlacement = false
