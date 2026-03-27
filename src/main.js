@@ -110,6 +110,26 @@ class GameScene extends Phaser.Scene {
     return result
   }
 
+  animateBreaking(obj) {
+    const objX = obj.x
+
+    this.emitter.startFollow(obj)
+    this.emitter.start()
+
+    // Shake tree
+    this.tweens.add({
+      targets: obj,
+      x: objX + 4,
+      duration: 40,
+      yoyo: true,
+      repeat: 2,
+      onComplete: () => {
+        obj.x = objX;
+      }
+    })
+
+  }
+
   addTree(x, y) {
     // Tree
     const treeWorld = gridToWorld(x, y)
@@ -122,20 +142,8 @@ class GameScene extends Phaser.Scene {
     tree.on("pointerdown", (pointer) => {
       const treeHealth = tree.getData(TREE_DATA.HEALTH) - 1
       tree.setData(TREE_DATA.HEALTH, treeHealth)
-      this.emitter.startFollow(tree)
-      this.emitter.start()
-
-      // Shake tree
-      this.tweens.add({
-        targets: tree,
-        x: treeWorld.x + 4,
-        duration: 40,
-        yoyo: true,
-        repeat: 2,
-        onComplete: () => {
-          tree.x = treeWorld.x;
-        }
-      })
+      
+      this.animateBreaking(tree)
 
       if (treeHealth <= 0) {
         tree.destroy()
@@ -271,6 +279,8 @@ class GameScene extends Phaser.Scene {
             const block = tile.getData(TILE_DATA.BLOCK)
 
             if (block) {
+              this.animateBreaking(block)
+
               this.inventoryWoodCount += 1
               this.inventoryText.setText(`WOOD: ${this.inventoryWoodCount}`)
               block.destroy()
