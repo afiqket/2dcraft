@@ -22,6 +22,14 @@ const TILE_DATA = {
 const TREE_DATA = {
   HEALTH: "HEALTH"
 }
+const MONSTER_DATA = {
+  IS_AGGRO: "IS_AGGRO"
+}
+const AGGRO_RADIUS_DATA = {
+  MONSTER_REF: "MONSTER_REF"
+}
+const AGGRO_RADIUS = TILE_SIZE * 3
+const MONSTER_SPEED = 100
 
 // Map pixel color to tile id
 const PIXEL_TO_TILE = {
@@ -68,6 +76,7 @@ class GameScene extends Phaser.Scene {
 
     // Enemies (Monsters)
     this.monsterGroup
+    this.monsterRadiusGroup
   }
 
   preload() {
@@ -177,7 +186,13 @@ class GameScene extends Phaser.Scene {
     this.physics.add.existing(monster)
     this.monsterGroup.add(monster)
     monster.body.setCollideWorldBounds(true)
-    monster.body.setImmovable(true)
+    monster.setData(MONSTER_DATA.IS_AGGRO, false)
+
+    const aggroRadius = this.add.circle(monster.x, monster.y, AGGRO_RADIUS, 0, 0)
+    this.physics.add.existing(aggroRadius)
+    aggroRadius.body.setCircle(AGGRO_RADIUS)
+    aggroRadius.setData(AGGRO_RADIUS_DATA.MONSTER_REF, monster)
+    this.monsterRadiusGroup.add(aggroRadius)
   }
 
   onPlayerMonsterCollide(player, monster) {
@@ -218,6 +233,11 @@ class GameScene extends Phaser.Scene {
     // })
   }
 
+  onPlayerEnterMonsterRadius(player, radius) {
+    const monster = radius.getData(AGGRO_RADIUS_DATA.MONSTER_REF)
+    monster.setData(MONSTER_DATA.IS_AGGRO, true)
+  }
+
   create() {
     // Build map from map.png
     map = this.buildMapFromImage("map")
@@ -254,6 +274,7 @@ class GameScene extends Phaser.Scene {
     this.treeGroup = this.physics.add.staticGroup();
     this.blockGroup = this.physics.add.staticGroup();
     this.monsterGroup = this.physics.add.group()
+    this.monsterRadiusGroup = this.physics.add.group()
 
     // Convert map.png to game map data
     for (let row = 0; row < map.length; row++) {
@@ -416,6 +437,7 @@ class GameScene extends Phaser.Scene {
     this.physics.add.collider(this.player, this.monsterGroup, this.onPlayerMonsterCollide, null, this)
     this.physics.add.collider(this.monsterGroup, this.blockGroup)
     this.physics.add.collider(this.monsterGroup, this.treeGroup)
+    this.physics.add.overlap(this.player, this.monsterRadiusGroup, this.onPlayerEnterMonsterRadius, null, this)
 
     // Camera
     this.cameras.main.setBounds(
@@ -430,10 +452,12 @@ class GameScene extends Phaser.Scene {
   }
 
   update() {
+    // Reset button
     if (this.keys.R.isDown) {
       resetGame()
     }
 
+    // Player movement
     const isUp = this.keys.UP.isDown || this.keys.W.isDown
     const isLeft = this.keys.LEFT.isDown || this.keys.A.isDown
     const isDown = this.keys.DOWN.isDown || this.keys.S.isDown
@@ -460,6 +484,7 @@ class GameScene extends Phaser.Scene {
 
     this.player.body.setVelocity(vec.x, vec.y);
 
+    // Block placement
     if (this.physics.overlap(this.player, this.hoverBox)
       || this.physics.overlap(this.treeGroup, this.hoverBox)
       || this.physics.overlap(this.monsterGroup, this.hoverBox)) {
@@ -467,6 +492,17 @@ class GameScene extends Phaser.Scene {
     } else {
       this.isInvalidPlacement = false
     }
+
+    // Update monster
+    this.monsterGroup.children.each((monster) => {
+      if (monster.getData(MONSTER_DATA.IS_AGGRO)) {
+        const monsterVec = new Phaser.Math.Vector2(monster.x - this.player.x, monster.y - this.player.y)
+          .normalize()
+          .scale(-MONSTER_SPEED)
+
+        monster.body.setVelocity(monsterVec.x, monsterVec.y)
+      }
+    })
   }
 }
 
