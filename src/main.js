@@ -1,6 +1,8 @@
 import './style.css'
 import Phaser from "phaser"
 
+let game
+
 const CANVAS_WIDTH = 500
 const CANVAS_HEIGHT = 500
 const TILE_SIZE = 50
@@ -320,7 +322,7 @@ class GameScene extends Phaser.Scene {
 
     // Controls
     this.keys = this.input.keyboard.addKeys(
-      "W,A,S,D,LEFT,RIGHT,UP,DOWN"
+      "W,A,S,D,LEFT,RIGHT,UP,DOWN,R"
     )
 
     // Collision
@@ -341,6 +343,10 @@ class GameScene extends Phaser.Scene {
   }
 
   update() {
+    if (this.keys.R.isDown) {
+      resetGame()
+    }
+
     const isUp = this.keys.UP.isDown || this.keys.W.isDown
     const isLeft = this.keys.LEFT.isDown || this.keys.A.isDown
     const isDown = this.keys.DOWN.isDown || this.keys.S.isDown
@@ -391,4 +397,9 @@ const config = {
   scene: [GameScene],
 };
 
-const game = new Phaser.Game(config);
+game = new Phaser.Game(config);
+
+function resetGame() {
+  game.destroy(false)
+  game = new Phaser.Game(config);
+}
