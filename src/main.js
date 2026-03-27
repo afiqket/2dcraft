@@ -28,7 +28,8 @@ const PIXEL_TO_TILE = {
   0x41A6F6: 0,
   0xA7F070: 1,
   0x257179: 2,
-  0xB13E53: 3
+  0x3B5DC9: 3,
+  0xB13E53: 4
 }
 
 // This will be filled from map.png
@@ -61,6 +62,9 @@ class GameScene extends Phaser.Scene {
     this.hoverBox;
     this.isInvalidPlacement = false;
     this.emitter;
+
+    // Enemies (Monsters)
+    this.monsterGroup
   }
 
   preload() {
@@ -190,14 +194,12 @@ class GameScene extends Phaser.Scene {
     // Tree group
     this.treeGroup = this.physics.add.staticGroup();
 
-    // Blocks on the ground
+    // Convert map.png to game map data
     this.tileGroup = this.physics.add.staticGroup();
     for (let row = 0; row < map.length; row++) {
       for (let col = 0; col < map[row].length; col++) {
         const tileId = map[row][col]
         let tileType
-        //         0x41A6F6: 0,
-        // 0xA7F070: 1,
         let color
         switch (tileId) {
           case 0:
@@ -224,6 +226,9 @@ class GameScene extends Phaser.Scene {
             tileType = "grass"
             color = 0x77DD77
             PLAYER_POSITION = { x: col, y: row }
+            break;
+
+          case 4:
             break;
 
           default:
@@ -306,12 +311,10 @@ class GameScene extends Phaser.Scene {
 
     // Player
     const playerWorld = gridToWorld(PLAYER_POSITION.x, PLAYER_POSITION.y)
-    this.player = this.add.circle(playerWorld.x, playerWorld.y, PLAYER_SIZE, 0xDC143C, 1)
+    this.player = this.add.circle(playerWorld.x, playerWorld.y, PLAYER_SIZE, 0x2b3faf, 1)
     this.player.setStrokeStyle(2, 0x000000, 1)
     this.player.setDepth(DEPTHS.PLAYER)
     this.physics.add.existing(this.player)
-
-
 
     // Effects
     this.emitter = this.add.particles(0, 0, "tree_particle", {
