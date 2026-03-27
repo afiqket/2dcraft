@@ -47,15 +47,18 @@ function gridToWorld(x, y) {
 class GameScene extends Phaser.Scene {
   constructor() {
     super("scene-game");
+    // Player and Gameplay
     this.player;
-    this.inputs;
+    this.keys;
+    this.inventoryText;
+    this.inventoryWoodCount = 0;
+
+    // Tiles and Blocks
     this.tileGroup;
+    this.treeGroup
     this.hoverBox;
     this.isInvalidPlacement = false;
     this.emitter;
-    this.inventoryText;
-    this.inventoryWoodCount = 0;
-    this.treeGroup
   }
 
   preload() {
@@ -316,8 +319,9 @@ class GameScene extends Phaser.Scene {
     .setDepth(DEPTHS.TEXT)
 
     // Controls
-    /** @type {Phaser.Types.Input.Keyboard.CursorKeys} */
-    this.inputs = this.input.keyboard.createCursorKeys()
+    this.keys = this.input.keyboard.addKeys(
+      "W,A,S,D,LEFT,RIGHT,UP,DOWN"
+    )
 
     // Collision
     this.player.body.setCollideWorldBounds(true)
@@ -337,20 +341,23 @@ class GameScene extends Phaser.Scene {
   }
 
   update() {
-    const { up, down, left, right } = this.inputs
+    const isUp = this.keys.UP.isDown || this.keys.W.isDown
+    const isLeft = this.keys.LEFT.isDown || this.keys.A.isDown
+    const isDown = this.keys.DOWN.isDown || this.keys.S.isDown
+    const isRight = this.keys.RIGHT.isDown || this.keys.D.isDown
 
     let velocityX = 0;
     let velocityY = 0;
 
-    if (left.isDown) {
+    if (isLeft) {
       velocityX = -1
-    } else if (right.isDown) {
+    } else if (isRight) {
       velocityX = 1
     }
 
-    if (up.isDown) {
+    if (isUp) {
       velocityY = -1
-    } else if (down.isDown) {
+    } else if (isDown) {
       velocityY = 1
     }
 
