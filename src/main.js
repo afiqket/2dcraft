@@ -160,6 +160,7 @@ class GameScene extends Phaser.Scene {
 
       if (treeHealth <= 0) {
         tree.destroy()
+        this.animateShake(this.inventoryText)
         this.inventoryWoodCount += 2
         this.inventoryText.setText(`WOOD: ${this.inventoryWoodCount}`)
       }
@@ -202,16 +203,19 @@ class GameScene extends Phaser.Scene {
       ease: "Quad.easeOut"
     })
 
-    // this.animateShake(this.player)
-
-    console.log("player hit monster")
     this.playerIsInvincible = true
     this.player.setStrokeStyle(2, 0xffffff, 1)
+    // this.healthText.setColor("#ff0000")
+    this.animateShake(this.healthText)
 
     this.time.delayedCall(500, () => {
       this.playerIsInvincible = false
       this.player.setStrokeStyle(2, 0x000000, 1)
     })
+
+    // this.time.delayedCall(100, () => {
+    //   this.healthText.setColor("#000000")
+    // })
   }
 
   create() {
@@ -348,6 +352,7 @@ class GameScene extends Phaser.Scene {
 
               this.inventoryWoodCount += 1
               this.inventoryText.setText(`WOOD: ${this.inventoryWoodCount}`)
+              this.animateShake(this.inventoryText)
               block.destroy()
               tile.setData(TILE_DATA.BLOCK, null)
             }
