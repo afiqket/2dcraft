@@ -122,7 +122,7 @@ class GameScene extends Phaser.Scene {
       tree.setData(TREE_DATA.HEALTH, treeHealth)
       this.emitter.startFollow(tree)
       this.emitter.start()
-      
+
       // Shake tree
       this.tweens.add({
         targets: tree,
@@ -186,8 +186,8 @@ class GameScene extends Phaser.Scene {
       for (let col = 0; col < map[row].length; col++) {
         const tileId = map[row][col]
         let tileType
-  //         0x41A6F6: 0,
-  // 0xA7F070: 1,
+        //         0x41A6F6: 0,
+        // 0xA7F070: 1,
         let color
         switch (tileId) {
           case 0:
@@ -316,7 +316,7 @@ class GameScene extends Phaser.Scene {
       font: "25px Monospace",
       fill: "#000000"
     }).setScrollFactor(0) // Set dont move with camera
-    .setDepth(DEPTHS.TEXT)
+      .setDepth(DEPTHS.TEXT)
 
     // Controls
     this.keys = this.input.keyboard.addKeys(
@@ -372,12 +372,6 @@ class GameScene extends Phaser.Scene {
     } else {
       this.isInvalidPlacement = false
     }
-
-    // if (this.tree.getData(TREE_DATA.HEALTH) <= 0) {
-    //   this.tree.destroy()
-    //   this.inventoryWoodCount += 5
-    //   this.inventoryText.setText(`WOOD: ${this.inventoryWoodCount}`)
-    // }
   }
 }
 
