@@ -52,12 +52,15 @@ class GameScene extends Phaser.Scene {
     super("scene-game");
     // Player and Gameplay
     this.player;
+    this.playerHealth = 100;
+    this.playerIsInvincible = false;
     this.keys;
     this.inventoryText;
     this.inventoryWoodCount = 0;
+    this.healthText;
 
     // Tiles and Blocks
-    this.tileGroup;
+    this.blockGroup;
     this.treeGroup
     this.hoverBox;
     this.isInvalidPlacement = false;
@@ -114,24 +117,29 @@ class GameScene extends Phaser.Scene {
     return result
   }
 
-  animateBreaking(obj) {
+  animateShake(obj) {
     const objX = obj.x
+    const objY = obj.y
 
-    this.emitter.startFollow(obj)
-    this.emitter.start()
-
-    // Shake tree
     this.tweens.add({
       targets: obj,
       x: objX + 4,
+      y: objY - 4,
       duration: 40,
       yoyo: true,
       repeat: 2,
       onComplete: () => {
         obj.x = objX;
+        obj.y = objY;
       }
     })
+  }
 
+  animateBreaking(obj) {
+    this.emitter.startFollow(obj)
+    this.emitter.start()
+
+    this.animateShake(obj)
   }
 
   addTree(x, y) {
@@ -144,11 +152,10 @@ class GameScene extends Phaser.Scene {
     tree.setData(TREE_DATA.HEALTH, 3)
     tree.setInteractive()
     tree.on("pointerdown", (pointer) => {
-      if (pointer.rightButtonDown()) 
-        {return}
+      if (pointer.rightButtonDown()) { return }
       const treeHealth = tree.getData(TREE_DATA.HEALTH) - 1
       tree.setData(TREE_DATA.HEALTH, treeHealth)
-      
+
       this.animateBreaking(tree)
 
       if (treeHealth <= 0) {
@@ -168,6 +175,43 @@ class GameScene extends Phaser.Scene {
     monster.setDepth(DEPTHS.PLAYER)
     this.physics.add.existing(monster)
     this.monsterGroup.add(monster)
+    monster.body.setCollideWorldBounds(true)
+    monster.body.setImmovable(true)
+  }
+
+  onPlayerMonsterCollide(player, monster) {
+    if (this.playerIsInvincible) {
+      return
+    }
+
+    this.playerHealth -= 20
+    this.healthText.setText(`HEALTH: ${this.playerHealth}`)
+    if (this.playerHealth == 0) {
+      resetGame()
+    }
+
+    const vec = new Phaser.Math.Vector2(monster.x - player.x, monster.y - player.y)
+      .normalize()
+      .scale(-50)
+
+    this.tweens.add({
+      targets: player,
+      x: player.x + vec.x,
+      y: player.y + vec.y,
+      duration: 100,
+      ease: "Quad.easeOut"
+    })
+
+    // this.animateShake(this.player)
+
+    console.log("player hit monster")
+    this.playerIsInvincible = true
+    this.player.setStrokeStyle(2, 0xffffff, 1)
+
+    this.time.delayedCall(500, () => {
+      this.playerIsInvincible = false
+      this.player.setStrokeStyle(2, 0x000000, 1)
+    })
   }
 
   create() {
@@ -204,7 +248,7 @@ class GameScene extends Phaser.Scene {
 
     // Groups
     this.treeGroup = this.physics.add.staticGroup();
-    this.tileGroup = this.physics.add.staticGroup();
+    this.blockGroup = this.physics.add.staticGroup();
     this.monsterGroup = this.physics.add.group()
 
     // Convert map.png to game map data
@@ -291,7 +335,7 @@ class GameScene extends Phaser.Scene {
             tile.setData(TILE_DATA.BLOCK, block)
 
             this.physics.add.existing(block, true)
-            this.tileGroup.add(block)
+            this.blockGroup.add(block)
 
             this.inventoryWoodCount -= 1
             this.inventoryText.setText(`WOOD: ${this.inventoryWoodCount}`)
@@ -342,8 +386,14 @@ class GameScene extends Phaser.Scene {
       emitting: false
     }).setDepth(DEPTHS.PLAYER)
 
-    // Text (Inventory)
+    // Text
     this.inventoryText = this.add.text(20, CANVAS_HEIGHT - 40, "WOOD: 0", {
+      font: "25px Monospace",
+      fill: "#000000"
+    }).setScrollFactor(0) // Set dont move with camera
+      .setDepth(DEPTHS.TEXT)
+
+    this.healthText = this.add.text(20, 20, "HEALTH: 100", {
       font: "25px Monospace",
       fill: "#000000"
     }).setScrollFactor(0) // Set dont move with camera
@@ -356,8 +406,11 @@ class GameScene extends Phaser.Scene {
 
     // Collision
     this.player.body.setCollideWorldBounds(true)
-    this.physics.add.collider(this.player, this.tileGroup)
+    this.physics.add.collider(this.player, this.blockGroup)
     this.physics.add.collider(this.player, this.treeGroup)
+    this.physics.add.collider(this.player, this.monsterGroup, this.onPlayerMonsterCollide, null, this)
+    this.physics.add.collider(this.monsterGroup, this.blockGroup)
+    this.physics.add.collider(this.monsterGroup, this.treeGroup)
 
     // Camera
     this.cameras.main.setBounds(
@@ -402,7 +455,7 @@ class GameScene extends Phaser.Scene {
 
     this.player.body.setVelocity(vec.x, vec.y);
 
-    if (this.physics.overlap(this.player, this.hoverBox) 
+    if (this.physics.overlap(this.player, this.hoverBox)
       || this.physics.overlap(this.treeGroup, this.hoverBox)
       || this.physics.overlap(this.monsterGroup, this.hoverBox)) {
       this.isInvalidPlacement = true
