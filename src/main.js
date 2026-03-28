@@ -7,12 +7,14 @@ const CANVAS_WIDTH = 500
 const CANVAS_HEIGHT = 500
 const TILE_SIZE = 50
 const CIRCLE_SIZE = TILE_SIZE / 3
+const SWORD_SIZE = 50
 const PLAYER_SPEED = 200
 const DEPTHS = {
   TILES: 0,
   BLOCKS: 10,
   HOVER: 20,
   PLAYER: 30,
+  SWORD: 40,
   TEXT: 100
 }
 const TILE_DATA = {
@@ -67,6 +69,7 @@ class GameScene extends Phaser.Scene {
     this.inventoryText;
     this.inventoryWoodCount = 0;
     this.healthText;
+    this.sword;
 
     // Tiles and Blocks
     this.blockGroup;
@@ -84,6 +87,7 @@ class GameScene extends Phaser.Scene {
     this.load.image("tree", "./assets/tree.png")
     this.load.image("tree_particle", "./assets/tree_particle.png")
     this.load.image("map", "./assets/map.png")
+    this.load.image("sword", "./assets/sword.png")
   }
 
   buildMapFromImage(textureKey) {
@@ -361,7 +365,7 @@ class GameScene extends Phaser.Scene {
           if (this.inventoryCurrHolding != 1) {
             return
           }
-          
+
           if (pointer.rightButtonDown()) {
             if (tile.getData(TILE_DATA.BLOCK) || this.isInvalidPlacement || this.inventoryWoodCount === 0) {
               return
@@ -444,6 +448,11 @@ class GameScene extends Phaser.Scene {
       fill: "#000000"
     }).setScrollFactor(0) // Set dont move with camera
       .setDepth(DEPTHS.TEXT)
+
+    this.sword = this.add.image(this.player.x, this.player.y, "sword")
+      .setDepth(DEPTHS.SWORD)
+      .setDisplaySize(SWORD_SIZE, SWORD_SIZE)
+    this.textures.get("sword").setFilter(Phaser.Textures.FilterMode.NEAREST);
 
     // Controls
     this.keys = this.input.keyboard.addKeys(
