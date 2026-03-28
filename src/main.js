@@ -63,6 +63,7 @@ class GameScene extends Phaser.Scene {
     this.playerHealth = 100;
     this.playerIsInvincible = false;
     this.keys;
+    this.inventoryCurrHolding = 1;
     this.inventoryText;
     this.inventoryWoodCount = 0;
     this.healthText;
@@ -161,6 +162,9 @@ class GameScene extends Phaser.Scene {
     tree.setData(TREE_DATA.HEALTH, 3)
     tree.setInteractive()
     tree.on("pointerdown", (pointer) => {
+      if (this.inventoryCurrHolding != 1) {
+        return
+      }
       if (pointer.rightButtonDown()) { return }
       const treeHealth = tree.getData(TREE_DATA.HEALTH) - 1
       tree.setData(TREE_DATA.HEALTH, treeHealth)
@@ -171,7 +175,7 @@ class GameScene extends Phaser.Scene {
         tree.destroy()
         this.animateShake(this.inventoryText)
         this.inventoryWoodCount += 2
-        this.inventoryText.setText(`WOOD: ${this.inventoryWoodCount}`)
+        this.updateInventoryText()
       }
     }
     )
@@ -236,6 +240,17 @@ class GameScene extends Phaser.Scene {
   onPlayerEnterMonsterRadius(player, radius) {
     const monster = radius.getData(AGGRO_RADIUS_DATA.MONSTER_REF)
     monster.setData(MONSTER_DATA.IS_AGGRO, true)
+  }
+
+  updateInventoryText() {
+    let text
+    if (this.inventoryCurrHolding == 1) {
+      text = `(1) WOOD: ${this.inventoryWoodCount}\n 2  SWORD`
+    } else if (this.inventoryCurrHolding == 2) {
+      text = ` 1  WOOD: ${this.inventoryWoodCount}\n(2) SWORD`
+    }
+
+    this.inventoryText.setText(text)
   }
 
   create() {
@@ -343,6 +358,10 @@ class GameScene extends Phaser.Scene {
         tile.setInteractive()
 
         tile.on("pointerdown", (pointer) => {
+          if (this.inventoryCurrHolding != 1) {
+            return
+          }
+          
           if (pointer.rightButtonDown()) {
             if (tile.getData(TILE_DATA.BLOCK) || this.isInvalidPlacement || this.inventoryWoodCount === 0) {
               return
@@ -363,7 +382,7 @@ class GameScene extends Phaser.Scene {
             this.blockGroup.add(block)
 
             this.inventoryWoodCount -= 1
-            this.inventoryText.setText(`WOOD: ${this.inventoryWoodCount}`)
+            this.updateInventoryText()
           }
           else if (pointer.leftButtonDown()) {
             const block = tile.getData(TILE_DATA.BLOCK)
@@ -372,7 +391,7 @@ class GameScene extends Phaser.Scene {
               this.animateBreaking(block)
 
               this.inventoryWoodCount += 1
-              this.inventoryText.setText(`WOOD: ${this.inventoryWoodCount}`)
+              this.updateInventoryText()
               this.animateShake(this.inventoryText)
               block.destroy()
               tile.setData(TILE_DATA.BLOCK, null)
@@ -413,11 +432,12 @@ class GameScene extends Phaser.Scene {
     }).setDepth(DEPTHS.PLAYER)
 
     // Text
-    this.inventoryText = this.add.text(20, CANVAS_HEIGHT - 40, "WOOD: 0", {
+    this.inventoryText = this.add.text(20, CANVAS_HEIGHT - 60, "", {
       font: "25px Monospace",
       fill: "#000000"
     }).setScrollFactor(0) // Set dont move with camera
       .setDepth(DEPTHS.TEXT)
+    this.updateInventoryText()
 
     this.healthText = this.add.text(20, 20, "HEALTH: 100", {
       font: "25px Monospace",
@@ -427,7 +447,7 @@ class GameScene extends Phaser.Scene {
 
     // Controls
     this.keys = this.input.keyboard.addKeys(
-      "W,A,S,D,LEFT,RIGHT,UP,DOWN,R"
+      "W,A,S,D,LEFT,RIGHT,UP,DOWN,R,ONE,TWO"
     )
 
     // Collision
@@ -483,6 +503,14 @@ class GameScene extends Phaser.Scene {
       .scale(PLAYER_SPEED)
 
     this.player.body.setVelocity(vec.x, vec.y);
+
+    // Update currently holding
+    if (this.keys.ONE.isDown) {
+      this.inventoryCurrHolding = 1
+    } else if (this.keys.TWO.isDown) {
+      this.inventoryCurrHolding = 2
+    }
+    this.updateInventoryText()
 
     // Block placement
     if (this.physics.overlap(this.player, this.hoverBox)
