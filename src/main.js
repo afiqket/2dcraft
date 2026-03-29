@@ -245,9 +245,9 @@ class GameScene extends Phaser.Scene {
   updateInventoryText() {
     let text
     if (this.inventoryCurrHolding == 1) {
-      text = `(1) WOOD: ${this.inventoryWoodCount}\n 2  SWORD`
+      text = `(1) WOOD: ${this.inventoryWoodCount}\n 2  FIREBALL`
     } else if (this.inventoryCurrHolding == 2) {
-      text = ` 1  WOOD: ${this.inventoryWoodCount}\n(2) SWORD`
+      text = ` 1  WOOD: ${this.inventoryWoodCount}\n(2) FIREBALL`
     }
 
     this.inventoryText.setText(text)
