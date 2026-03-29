@@ -263,11 +263,27 @@ class GameScene extends Phaser.Scene {
   // the two objects are passed in the same order you specified, unless you are 
   // colliding Group vs Sprite, in which case Sprite is always the first parameter.
   onMonsterFireballCollide(fireball, monster) {
+    monster.setData(MONSTER_DATA.IS_AGGRO, true)
     let monsterHealth = monster.getData(MONSTER_DATA.HEALTH) - 20
     console.log(`${monsterHealth}`)
     monster.setData(MONSTER_DATA.HEALTH, monsterHealth)
     fireball.setVisible(false)
     fireball.body.enable = false
+
+    const vec = getVectorBetweenObjects(fireball, monster, 50)
+
+    this.tweens.add({
+      targets: monster,
+      x: monster.x + vec.x,
+      y: monster.y + vec.y,
+      duration: 100,
+      ease: "Quad.easeOut"
+    })
+
+    monster.setStrokeStyle(2, 0xffffff, 1)
+    this.time.delayedCall(300, () => {
+      monster.setStrokeStyle(2, 0x000000, 1)
+    })
 
     if (monsterHealth <= 0) {
       monster.destroy()
@@ -513,7 +529,7 @@ class GameScene extends Phaser.Scene {
     this.physics.add.collider(this.player, this.monsterGroup, this.onPlayerMonsterCollide, null, this)
     this.physics.add.collider(this.monsterGroup, this.blockGroup)
     this.physics.add.collider(this.monsterGroup, this.treeGroup)
-    this.physics.add.collider(this.monsterGroup, this.fireball, this.onMonsterFireballCollide, null, this)
+    this.physics.add.overlap(this.monsterGroup, this.fireball, this.onMonsterFireballCollide, null, this)
     this.physics.add.overlap(this.player, this.monsterRadiusGroup, this.onPlayerEnterMonsterRadius, null, this)
 
     // Camera
