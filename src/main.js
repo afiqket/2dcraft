@@ -56,6 +56,18 @@ function gridToWorld(x, y) {
   }
 }
 
+// Finds the vector pointing from obj1 to obj2, scaled.
+// Returns that vector.
+// Assumes that the objects have x and y attributes.
+function getVectorBetweenObjects(obj1, obj2, scale = 1) {
+  let vec = new Phaser.Math.Vector2(obj2.x - obj1.x, obj2.y - obj1.y)
+    .normalize()
+    .scale(scale)
+
+  return vec
+}
+
+
 class GameScene extends Phaser.Scene {
   constructor() {
     super("scene-game");
@@ -213,9 +225,7 @@ class GameScene extends Phaser.Scene {
       resetGame()
     }
 
-    const vec = new Phaser.Math.Vector2(monster.x - player.x, monster.y - player.y)
-      .normalize()
-      .scale(-50)
+    const vec = getVectorBetweenObjects(monster, player, 50)
 
     this.tweens.add({
       targets: player,
@@ -459,6 +469,8 @@ class GameScene extends Phaser.Scene {
       .setDisplaySize(FIREBALL_SIZE, FIREBALL_SIZE)
     this.textures.get("fireball").setFilter(Phaser.Textures.FilterMode.NEAREST);
     this.physics.add.existing(this.fireball)
+    this.fireball.setVisible(false)
+    this.fireball.body.enable = false
 
     // Collision
     this.player.body.setCollideWorldBounds(true)
@@ -534,9 +546,7 @@ class GameScene extends Phaser.Scene {
     // Update monster
     this.monsterGroup.children.each((monster) => {
       if (monster.getData(MONSTER_DATA.IS_AGGRO)) {
-        const monsterVec = new Phaser.Math.Vector2(monster.x - this.player.x, monster.y - this.player.y)
-          .normalize()
-          .scale(-MONSTER_SPEED)
+        const monsterVec = getVectorBetweenObjects(monster, this.player, MONSTER_SPEED)
 
         monster.body.setVelocity(monsterVec.x, monsterVec.y)
       }
