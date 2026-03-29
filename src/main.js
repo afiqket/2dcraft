@@ -270,7 +270,7 @@ class GameScene extends Phaser.Scene {
     fireball.setVisible(false)
     fireball.body.enable = false
 
-    const vec = getVectorBetweenObjects(fireball, monster, 50)
+    const vec = new Phaser.Math.Vector2().setToPolar(fireball.rotation, 50)
 
     this.tweens.add({
       targets: monster,
