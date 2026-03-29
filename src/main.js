@@ -469,8 +469,14 @@ class GameScene extends Phaser.Scene {
       .setDisplaySize(FIREBALL_SIZE, FIREBALL_SIZE)
     this.textures.get("fireball").setFilter(Phaser.Textures.FilterMode.NEAREST);
     this.physics.add.existing(this.fireball)
-    this.fireball.setVisible(false)
-    this.fireball.body.enable = false
+    // this.fireball.setVisible(false)
+    // this.fireball.body.enable = false
+
+    this.input.on("pointerdown", () => {
+      const pointer = this.input.activePointer.positionToCamera(this.cameras.main)
+      const pointerVec = getVectorBetweenObjects(this.player, pointer, 1)
+      this.fireball.setRotation(pointerVec.angle())
+    })
 
     // Collision
     this.player.body.setCollideWorldBounds(true)
