@@ -9,7 +9,7 @@ const TILE_SIZE = 50
 const CIRCLE_SIZE = TILE_SIZE / 3
 const PLAYER_SPEED = 200
 const FIREBALL_SIZE = 50
-const FIREBALL_SPEED = 300
+const FIREBALL_SPEED = 500
 const DEPTHS = {
   TILES: 0,
   BLOCKS: 10,
@@ -83,6 +83,7 @@ class GameScene extends Phaser.Scene {
     this.inventoryWoodCount = 0;
     this.healthText;
     this.fireball
+    this.fireballIsCooldown = false
 
     // Tiles and Blocks
     this.blockGroup;
@@ -265,7 +266,6 @@ class GameScene extends Phaser.Scene {
   onMonsterFireballCollide(fireball, monster) {
     monster.setData(MONSTER_DATA.IS_AGGRO, true)
     let monsterHealth = monster.getData(MONSTER_DATA.HEALTH) - 20
-    console.log(`${monsterHealth}`)
     monster.setData(MONSTER_DATA.HEALTH, monsterHealth)
     fireball.setVisible(false)
     fireball.body.enable = false
@@ -508,7 +508,9 @@ class GameScene extends Phaser.Scene {
     this.fireball.body.enable = false
 
     this.input.on("pointerdown", (pointer) => {
-      if (this.inventoryCurrHolding != 2 || !(pointer.leftButtonDown())) {
+      if (this.inventoryCurrHolding != 2
+        || !(pointer.leftButtonDown())
+        || this.fireballIsCooldown) {
         return
       }
 
@@ -520,7 +522,16 @@ class GameScene extends Phaser.Scene {
 
       this.fireball.setVisible(true)
       this.fireball.body.enable = true
+      this.fireballIsCooldown = true
+
+      // Fireball cooldown
+      this.time.delayedCall(500, () => {
+        this.fireballIsCooldown = false
+        this.fireball.setVisible(false)
+        this.fireball.body.enable = false
+      })
     })
+
 
     // Collision
     this.player.body.setCollideWorldBounds(true)
@@ -614,7 +625,7 @@ const config = {
     default: "arcade",
     arcade: {
       // gravity: { y: speedDown },
-      debug: true,
+      // debug: true,
     },
   },
   // pixelArt: true,
