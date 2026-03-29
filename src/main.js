@@ -8,7 +8,8 @@ const CANVAS_HEIGHT = 500
 const TILE_SIZE = 50
 const CIRCLE_SIZE = TILE_SIZE / 3
 const PLAYER_SPEED = 200
-const FIREBALL_SIZE = 30
+const FIREBALL_SIZE = 50
+const FIREBALL_SPEED = 300
 const DEPTHS = {
   TILES: 0,
   BLOCKS: 10,
@@ -24,7 +25,8 @@ const TREE_DATA = {
   HEALTH: "HEALTH"
 }
 const MONSTER_DATA = {
-  IS_AGGRO: "IS_AGGRO"
+  IS_AGGRO: "IS_AGGRO",
+  HEALTH: "HEALTH"
 }
 const AGGRO_RADIUS_DATA = {
   MONSTER_REF: "MONSTER_REF"
@@ -469,13 +471,18 @@ class GameScene extends Phaser.Scene {
       .setDisplaySize(FIREBALL_SIZE, FIREBALL_SIZE)
     this.textures.get("fireball").setFilter(Phaser.Textures.FilterMode.NEAREST);
     this.physics.add.existing(this.fireball)
-    // this.fireball.setVisible(false)
-    // this.fireball.body.enable = false
+    this.fireball.setVisible(false)
+    this.fireball.body.enable = false
 
     this.input.on("pointerdown", () => {
       const pointer = this.input.activePointer.positionToCamera(this.cameras.main)
-      const pointerVec = getVectorBetweenObjects(this.player, pointer, 1)
+      const pointerVec = getVectorBetweenObjects(this.player, pointer, FIREBALL_SPEED)
       this.fireball.setRotation(pointerVec.angle())
+      this.fireball.setPosition(this.player.x, this.player.y)
+      this.fireball.body.setVelocity(pointerVec.x, pointerVec.y)
+
+      this.fireball.setVisible(true)
+      this.fireball.body.enable = true
     })
 
     // Collision
