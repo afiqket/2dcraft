@@ -209,6 +209,8 @@ class GameScene extends Phaser.Scene {
     monster.body.setCollideWorldBounds(true)
     monster.setData(MONSTER_DATA.IS_AGGRO, false)
 
+    monster.setData(MONSTER_DATA.HEALTH, 60)
+
     const aggroRadius = this.add.circle(monster.x, monster.y, AGGRO_RADIUS, 0, 0)
     this.physics.add.existing(aggroRadius)
     aggroRadius.body.setCircle(AGGRO_RADIUS)
@@ -255,6 +257,21 @@ class GameScene extends Phaser.Scene {
   onPlayerEnterMonsterRadius(player, radius) {
     const monster = radius.getData(AGGRO_RADIUS_DATA.MONSTER_REF)
     monster.setData(MONSTER_DATA.IS_AGGRO, true)
+  }
+
+  // Stupid Group vs Sprite exception:
+  // the two objects are passed in the same order you specified, unless you are 
+  // colliding Group vs Sprite, in which case Sprite is always the first parameter.
+  onMonsterFireballCollide(fireball, monster) {
+    let monsterHealth = monster.getData(MONSTER_DATA.HEALTH) - 20
+    console.log(`${monsterHealth}`)
+    monster.setData(MONSTER_DATA.HEALTH, monsterHealth)
+    fireball.setVisible(false)
+    fireball.body.enable = false
+
+    if (monsterHealth <= 0) {
+      monster.destroy()
+    }
   }
 
   updateInventoryText() {
@@ -474,9 +491,13 @@ class GameScene extends Phaser.Scene {
     this.fireball.setVisible(false)
     this.fireball.body.enable = false
 
-    this.input.on("pointerdown", () => {
-      const pointer = this.input.activePointer.positionToCamera(this.cameras.main)
-      const pointerVec = getVectorBetweenObjects(this.player, pointer, FIREBALL_SPEED)
+    this.input.on("pointerdown", (pointer) => {
+      if (this.inventoryCurrHolding != 2 || !(pointer.leftButtonDown())) {
+        return
+      }
+
+      const activePointer = this.input.activePointer.positionToCamera(this.cameras.main)
+      const pointerVec = getVectorBetweenObjects(this.player, activePointer, FIREBALL_SPEED)
       this.fireball.setRotation(pointerVec.angle())
       this.fireball.setPosition(this.player.x, this.player.y)
       this.fireball.body.setVelocity(pointerVec.x, pointerVec.y)
@@ -492,6 +513,7 @@ class GameScene extends Phaser.Scene {
     this.physics.add.collider(this.player, this.monsterGroup, this.onPlayerMonsterCollide, null, this)
     this.physics.add.collider(this.monsterGroup, this.blockGroup)
     this.physics.add.collider(this.monsterGroup, this.treeGroup)
+    this.physics.add.collider(this.monsterGroup, this.fireball, this.onMonsterFireballCollide, null, this)
     this.physics.add.overlap(this.player, this.monsterRadiusGroup, this.onPlayerEnterMonsterRadius, null, this)
 
     // Camera
