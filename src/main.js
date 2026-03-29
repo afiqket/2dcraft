@@ -361,7 +361,7 @@ class GameScene extends Phaser.Scene {
           if (this.inventoryCurrHolding != 1) {
             return
           }
-          
+
           if (pointer.rightButtonDown()) {
             if (tile.getData(TILE_DATA.BLOCK) || this.isInvalidPlacement || this.inventoryWoodCount === 0) {
               return
