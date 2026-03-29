@@ -3,8 +3,8 @@ import Phaser from "phaser"
 
 let game
 
-const CANVAS_WIDTH = 500
-const CANVAS_HEIGHT = 500
+const CANVAS_WIDTH = 512
+const CANVAS_HEIGHT = 512
 const TILE_SIZE = 50
 const CIRCLE_SIZE = TILE_SIZE / 3
 const SWORD_SIZE = 50
@@ -60,7 +60,7 @@ function gridToWorld(x, y) {
 // Finds the vector pointing from obj1 to obj2, scaled.
 // Returns that vector.
 // Assumes that the objects have x and y attributes.
-function getVectorBetweenObjects(obj1, obj2, scale=1) {
+function getVectorBetweenObjects(obj1, obj2, scale = 1) {
   let vec = new Phaser.Math.Vector2(obj2.x - obj1.x, obj2.y - obj1.y)
     .normalize()
     .scale(scale)
@@ -462,12 +462,36 @@ class GameScene extends Phaser.Scene {
     this.sword = this.add.image(this.player.x, this.player.y, "sword")
       .setDepth(DEPTHS.SWORD)
       .setDisplaySize(SWORD_SIZE, SWORD_SIZE)
+      .setOrigin(0.5, 1.3)
     this.textures.get("sword").setFilter(Phaser.Textures.FilterMode.NEAREST);
+    this.physics.add.existing(this.sword, false)
+    this.sword.body.setDirectControl(true)
 
     // Controls
     this.keys = this.input.keyboard.addKeys(
       "W,A,S,D,LEFT,RIGHT,UP,DOWN,R,ONE,TWO"
     )
+    this.input.on("pointerdown", () => {
+      const pointer = this.input.activePointer.positionToCamera(this.cameras.main)
+      const swordVec = getVectorBetweenObjects(this.player, pointer, 30)
+        this.sword.setPosition(this.player.x, this.player.y)
+        this.sword.setRotation(swordVec.angle())
+
+      // console.log(`${swordVec.angle}`)
+  
+      this.sword.setVisible(true)
+      this.tweens.add({
+        targets: this.sword,
+        rotation: swordVec.angle() + Math.PI,
+        duration: 120,
+        ease: "Cubic.Out",
+        onComplete: () => {
+          this.swordSwinging = false
+          this.sword.setVisible(false)
+          // this.sword.setRotation(swordVec.angle())
+        }
+      })
+    })
 
     // Collision
     this.player.body.setCollideWorldBounds(true)
@@ -476,6 +500,7 @@ class GameScene extends Phaser.Scene {
     this.physics.add.collider(this.player, this.monsterGroup, this.onPlayerMonsterCollide, null, this)
     this.physics.add.collider(this.monsterGroup, this.blockGroup)
     this.physics.add.collider(this.monsterGroup, this.treeGroup)
+    this.physics.add.collider(this.monsterGroup, this.sword)
     this.physics.add.overlap(this.player, this.monsterRadiusGroup, this.onPlayerEnterMonsterRadius, null, this)
 
     // Camera
@@ -560,7 +585,7 @@ const config = {
     default: "arcade",
     arcade: {
       // gravity: { y: speedDown },
-      // debug: true,
+      debug: true,
     },
   },
   // pixelArt: true,
