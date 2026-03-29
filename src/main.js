@@ -8,6 +8,7 @@ const CANVAS_HEIGHT = 500
 const TILE_SIZE = 50
 const CIRCLE_SIZE = TILE_SIZE / 3
 const PLAYER_SPEED = 200
+const FIREBALL_SIZE = 30
 const DEPTHS = {
   TILES: 0,
   BLOCKS: 10,
@@ -67,6 +68,7 @@ class GameScene extends Phaser.Scene {
     this.inventoryText;
     this.inventoryWoodCount = 0;
     this.healthText;
+    this.fireball
 
     // Tiles and Blocks
     this.blockGroup;
@@ -84,6 +86,7 @@ class GameScene extends Phaser.Scene {
     this.load.image("tree", "./assets/tree.png")
     this.load.image("tree_particle", "./assets/tree_particle.png")
     this.load.image("map", "./assets/map.png")
+    this.load.image("fireball", "./assets/fireball.png")
   }
 
   buildMapFromImage(textureKey) {
@@ -450,6 +453,13 @@ class GameScene extends Phaser.Scene {
       "W,A,S,D,LEFT,RIGHT,UP,DOWN,R,ONE,TWO"
     )
 
+    // Fireball
+    this.fireball = this.add.image(this.player.x, this.player.y, "fireball")
+      .setDepth(DEPTHS.PLAYER)
+      .setDisplaySize(FIREBALL_SIZE, FIREBALL_SIZE)
+    this.textures.get("fireball").setFilter(Phaser.Textures.FilterMode.NEAREST);
+    this.physics.add.existing(this.fireball)
+
     // Collision
     this.player.body.setCollideWorldBounds(true)
     this.physics.add.collider(this.player, this.blockGroup)
@@ -543,7 +553,7 @@ const config = {
     default: "arcade",
     arcade: {
       // gravity: { y: speedDown },
-      // debug: true,
+      debug: true,
     },
   },
   // pixelArt: true,
