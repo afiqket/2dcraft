@@ -88,7 +88,10 @@ class GameScene extends Phaser.Scene {
     this.healthText;
     this.waveText = "";
     this.waveNum = 1;
+    this.waveMonsterCurrNum = 3;
+    this.waveMonsterMaxNum = 3;
     this.isWaveActive = true;
+    this.waveCountdown = null;
     this.timeNextWave = 0;
 
     // Tiles and Blocks
@@ -293,7 +296,29 @@ class GameScene extends Phaser.Scene {
 
     if (monsterHealth <= 0) {
       monster.destroy()
+      this.waveMonsterCurrNum--
+      if (this.waveMonsterCurrNum <= 0) {
+        this.endWave()
+      }
     }
+  }
+
+  endWave() {
+    this.waveNum++
+
+    this.waveCountdown = this.time.addEvent({
+      delay: 10000,
+      callback: () => {
+
+      },
+      callbackScope: this
+    })
+
+    this.isWaveActive = false
+  }
+
+  startWave() {
+    
   }
 
   updateInventoryText() {
@@ -312,7 +337,7 @@ class GameScene extends Phaser.Scene {
     if (this.isWaveActive) {
       text = `Wave ${this.waveNum}`
     } else {
-      text = `Time until next wave: ${this.timeNextWave.padStart(4, " ")}`
+      text = `Time next wave: ${this.timeNextWave.toString().padStart(2, " ")}`
     }
 
     this.waveText.setText(text)
@@ -391,8 +416,8 @@ class GameScene extends Phaser.Scene {
 
           case 4:
             // Monster
-            tileType = "grass"
-            color = 0x77DD77
+            tileType = "monsterSpawn"
+            color = 0xff3d3d // "#ff3d3d"
             this.addMonster(col, row)
             break;
 
@@ -563,6 +588,7 @@ class GameScene extends Phaser.Scene {
     this.physics.add.collider(this.player, this.treeGroup)
     this.physics.add.collider(this.player, this.monsterGroup, this.onPlayerMonsterCollide, null, this)
     this.physics.add.collider(this.monsterGroup, this.blockGroup)
+    this.physics.add.collider(this.monsterGroup, this.monsterGroup)
     this.physics.add.collider(this.monsterGroup, this.treeGroup)
     this.physics.add.overlap(this.monsterGroup, this.fireball, this.onMonsterFireballCollide, null, this)
     this.physics.add.overlap(this.player, this.monsterRadiusGroup, this.onPlayerEnterMonsterRadius, null, this)
@@ -637,6 +663,12 @@ class GameScene extends Phaser.Scene {
         monster.body.setVelocity(monsterVec.x, monsterVec.y)
       }
     })
+  
+    // Update wave text
+    if (!this.isWaveActive) {
+      this.timeNextWave = this.waveCountdown.getRemainingSeconds().toFixed(0)
+      this.updateWaveText()
+    }
   }
 }
 
