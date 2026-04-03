@@ -43,6 +43,9 @@ const PIXEL_TO_TILE = {
   0xB13E53: 4
 }
 
+const NEXT_WAVE_SECONDS = 1 // 10 DEBUG
+const MONSTER_HEALTH = 1 // 60 DEBUG
+
 // This will be filled from map.png
 let map = []
 
@@ -100,6 +103,7 @@ class GameScene extends Phaser.Scene {
     this.hoverBox;
     this.isInvalidPlacement = false;
     this.emitter;
+    this.monsterTiles = []; // Elements like (x, y)
 
     // Enemies (Monsters)
     this.monsterGroup
@@ -219,7 +223,7 @@ class GameScene extends Phaser.Scene {
     monster.body.setCollideWorldBounds(true)
     monster.setData(MONSTER_DATA.IS_AGGRO, false)
 
-    monster.setData(MONSTER_DATA.HEALTH, 60)
+    monster.setData(MONSTER_DATA.HEALTH, MONSTER_HEALTH)
 
     const aggroRadius = this.add.circle(monster.x, monster.y, AGGRO_RADIUS, 0, 0)
     this.physics.add.existing(aggroRadius)
@@ -307,9 +311,9 @@ class GameScene extends Phaser.Scene {
     this.waveNum++
 
     this.waveCountdown = this.time.addEvent({
-      delay: 10000,
+      delay: NEXT_WAVE_SECONDS * 1000,
       callback: () => {
-
+        this.startWave()
       },
       callbackScope: this
     })
@@ -318,7 +322,19 @@ class GameScene extends Phaser.Scene {
   }
 
   startWave() {
-    
+    this.waveMonsterMaxNum = this.waveNum * 3
+    this.waveMonsterCurrNum = this.waveMonsterMaxNum
+
+    // Phaser.Utils.Array.Shuffle(this.monsterTiles)
+
+    let monsterCount = 0
+    for (const tile of this.monsterTiles) {
+      if (monsterCount >= this.waveMonsterMaxNum) {
+        break
+      }
+      this.addMonster(tile[0], tile[1])
+      monsterCount++
+    }
   }
 
   updateInventoryText() {
@@ -418,7 +434,8 @@ class GameScene extends Phaser.Scene {
             // Monster
             tileType = "monsterSpawn"
             color = 0xff3d3d // "#ff3d3d"
-            this.addMonster(col, row)
+            this.monsterTiles.push([col, row])
+            this.addMonster(col, row) // Might remove in the future
             break;
 
           default:
@@ -544,7 +561,7 @@ class GameScene extends Phaser.Scene {
 
     // Controls
     this.keys = this.input.keyboard.addKeys(
-      "W,A,S,D,LEFT,RIGHT,UP,DOWN,R,ONE,TWO"
+      "W,A,S,D,LEFT,RIGHT,UP,DOWN,R,ONE,TWO,X"
     )
 
     // Fireball
