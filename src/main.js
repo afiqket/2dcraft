@@ -78,12 +78,15 @@ class GameScene extends Phaser.Scene {
     this.playerHealth = 100;
     this.playerIsInvincible = false;
     this.keys;
+    this.fireball
+    this.fireballIsCooldown = false
+
+    // UI
     this.inventoryCurrHolding = 1;
     this.inventoryText;
     this.inventoryWoodCount = 0;
     this.healthText;
-    this.fireball
-    this.fireballIsCooldown = false
+    this.waveText;
 
     // Tiles and Blocks
     this.blockGroup;
@@ -492,6 +495,13 @@ class GameScene extends Phaser.Scene {
       fill: "#000000"
     }).setScrollFactor(0) // Set dont move with camera
       .setDepth(DEPTHS.TEXT)
+
+    this.waveText =  this.add.text(CANVAS_WIDTH - 20, 20, "Wave 1", {
+      font: "25px Monospace",
+      fill: "#000000"
+    }).setScrollFactor(0) // Set dont move with camera
+      .setDepth(DEPTHS.TEXT)
+      .setOrigin(1, 0)
 
     // Controls
     this.keys = this.input.keyboard.addKeys(
