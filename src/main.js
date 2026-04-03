@@ -31,7 +31,7 @@ const MONSTER_DATA = {
 const AGGRO_RADIUS_DATA = {
   MONSTER_REF: "MONSTER_REF"
 }
-const AGGRO_RADIUS = TILE_SIZE * 3
+const AGGRO_RADIUS = TILE_SIZE * 6
 const MONSTER_SPEED = 100
 
 // Map pixel color to tile id
@@ -43,8 +43,8 @@ const PIXEL_TO_TILE = {
   0xB13E53: 4
 }
 
-const NEXT_WAVE_SECONDS = 1 // 10 DEBUG
-const MONSTER_HEALTH = 1 // 60 DEBUG
+const NEXT_WAVE_SECONDS = 10 // 10 DEBUG
+const MONSTER_HEALTH = 60 // 60 DEBUG
 
 // This will be filled from map.png
 let map = []
@@ -309,6 +309,7 @@ class GameScene extends Phaser.Scene {
 
   endWave() {
     this.waveNum++
+    this.isWaveActive = false
 
     this.waveCountdown = this.time.addEvent({
       delay: NEXT_WAVE_SECONDS * 1000,
@@ -317,15 +318,16 @@ class GameScene extends Phaser.Scene {
       },
       callbackScope: this
     })
-
-    this.isWaveActive = false
   }
 
   startWave() {
-    this.waveMonsterMaxNum = this.waveNum * 3
+    this.isWaveActive = true
+    this.updateWaveText()
+
+    this.waveMonsterMaxNum = Math.min(this.waveNum * 3, this.monsterTiles.length)
     this.waveMonsterCurrNum = this.waveMonsterMaxNum
 
-    // Phaser.Utils.Array.Shuffle(this.monsterTiles)
+    Phaser.Utils.Array.Shuffle(this.monsterTiles)
 
     let monsterCount = 0
     for (const tile of this.monsterTiles) {
@@ -426,16 +428,15 @@ class GameScene extends Phaser.Scene {
           case 3:
             // Player
             tileType = "grass"
-            color = 0x77DD77
+            color = 0x77DD77 // "#77DD77"
             PLAYER_POSITION = { x: col, y: row }
             break;
 
           case 4:
             // Monster
             tileType = "monsterSpawn"
-            color = 0xff3d3d // "#ff3d3d"
+            color = 0x5cb85c // "#5cb85c"
             this.monsterTiles.push([col, row])
-            this.addMonster(col, row) // Might remove in the future
             break;
 
           default:
@@ -609,6 +610,7 @@ class GameScene extends Phaser.Scene {
     this.physics.add.collider(this.monsterGroup, this.treeGroup)
     this.physics.add.overlap(this.monsterGroup, this.fireball, this.onMonsterFireballCollide, null, this)
     this.physics.add.overlap(this.player, this.monsterRadiusGroup, this.onPlayerEnterMonsterRadius, null, this)
+    this.physics.add.collider(this.fireball, this.blockGroup)
 
     // Camera
     this.cameras.main.setBounds(
@@ -620,6 +622,7 @@ class GameScene extends Phaser.Scene {
     this.cameras.main.startFollow(this.player, true)
     this.cameras.main.setZoom(1)
 
+    this.startWave()
   }
 
   update() {
@@ -686,7 +689,9 @@ class GameScene extends Phaser.Scene {
       this.timeNextWave = this.waveCountdown.getRemainingSeconds().toFixed(0)
       this.updateWaveText()
     }
+
   }
+
 }
 
 const config = {
