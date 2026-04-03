@@ -86,7 +86,10 @@ class GameScene extends Phaser.Scene {
     this.inventoryText;
     this.inventoryWoodCount = 0;
     this.healthText;
-    this.waveText;
+    this.waveText = "";
+    this.waveNum = 1;
+    this.isWaveActive = true;
+    this.timeNextWave = 0;
 
     // Tiles and Blocks
     this.blockGroup;
@@ -302,6 +305,17 @@ class GameScene extends Phaser.Scene {
     }
 
     this.inventoryText.setText(text)
+  }
+
+  updateWaveText() {
+    let text
+    if (this.isWaveActive) {
+      text = `Wave ${this.waveNum}`
+    } else {
+      text = `Time until next wave: ${this.timeNextWave.padStart(4, " ")}`
+    }
+
+    this.waveText.setText(text)
   }
 
   create() {
