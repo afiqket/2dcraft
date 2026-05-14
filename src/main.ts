@@ -8,8 +8,8 @@ type TileType = 'water' | 'grass';
 
 type ArcadeBody = Phaser.Physics.Arcade.Body;
 type StaticArcadeBody = Phaser.Physics.Arcade.StaticBody;
-type ArcWithBody = Phaser.GameObjects.Arc & { body: ArcadeBody };
-// type ImageWithBody = Phaser.GameObjects.Image & { body: ArcadeBody };
+// type ArcWithBody = Phaser.GameObjects.Arc & { body: ArcadeBody };
+type ImageWithBody = Phaser.GameObjects.Image & { body: ArcadeBody };
 type RectangleWithBody = Phaser.GameObjects.Rectangle & {
   body: ArcadeBody | StaticArcadeBody;
 };
@@ -30,7 +30,7 @@ let game: Phaser.Game;
 const CANVAS_WIDTH = 500;
 const CANVAS_HEIGHT = 500;
 const TILE_SIZE = 50;
-const CIRCLE_SIZE = TILE_SIZE / 3;
+const PLAYER_SIZE = 100;
 const PLAYER_SPEED = 200;
 
 const DEPTHS = {
@@ -89,7 +89,7 @@ function gridToWorld(x: number, y: number): GridPosition {
 
 class GameScene extends Phaser.Scene {
   // Player and gameplay
-  private player!: ArcWithBody;
+  private player!: Phaser.GameObjects.Image;
   private keys!: KeyMap;
 
   // UI
@@ -112,6 +112,10 @@ class GameScene extends Phaser.Scene {
     this.load.image('tree', './assets/tree.png');
     this.load.image('tree_particle', './assets/tree_particle.png');
     this.load.image('map', './assets/map.png');
+    this.load.image('player_down', './assets/player_down.png');
+    this.load.image('player_right', './assets/player_right.png');
+    this.load.image('player_left', './assets/player_left.png');
+    this.load.image('player_down', './assets/player_down.png');
   }
 
   private buildMapFromImage(textureKey: string): TileId[][] {
@@ -371,8 +375,13 @@ class GameScene extends Phaser.Scene {
 
     // Player.
     const playerWorld = gridToWorld(PLAYER_POSITION.x, PLAYER_POSITION.y);
-    this.player = this.add.circle(playerWorld.x, playerWorld.y, CIRCLE_SIZE, 0x2b3faf, 1) as ArcWithBody;
-    this.player.setStrokeStyle(2, 0x000000, 1);
+    this.player = this.add.image(playerWorld.x, playerWorld.y,'player_down')
+      .setDisplaySize(PLAYER_SIZE, PLAYER_SIZE) as ImageWithBody;
+
+    this.textures.get('player_down').setFilter(Phaser.Textures.FilterMode.NEAREST);
+    this.textures.get('player_up').setFilter(Phaser.Textures.FilterMode.NEAREST);
+    this.textures.get('player_left').setFilter(Phaser.Textures.FilterMode.NEAREST);
+    this.textures.get('player_right').setFilter(Phaser.Textures.FilterMode.NEAREST);
     this.player.setDepth(DEPTHS.PLAYER);
     this.physics.add.existing(this.player);
 
