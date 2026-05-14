@@ -3,7 +3,7 @@ import Phaser from 'phaser';
 
 type GridPosition = { x: number; y: number };
 type TileId = 0 | 1 | 2 | 3 | 4;
-type TileType = 'water' | 'grass' | 'monsterSpawn';
+type TileType = 'water' | 'grass';
 type HasXY = { x: number; y: number };
 
 type ArcadeBody = Phaser.Physics.Arcade.Body;
@@ -32,8 +32,6 @@ const CANVAS_HEIGHT = 500;
 const TILE_SIZE = 50;
 const CIRCLE_SIZE = TILE_SIZE / 3;
 const PLAYER_SPEED = 200;
-const FIREBALL_SIZE = 50;
-const FIREBALL_SPEED = 500;
 
 const DEPTHS = {
   TILES: 0,
@@ -53,18 +51,6 @@ const TREE_DATA = {
   HEALTH: 'HEALTH',
 } as const;
 
-const MONSTER_DATA = {
-  IS_AGGRO: 'IS_AGGRO',
-  HEALTH: 'HEALTH',
-} as const;
-
-const AGGRO_RADIUS_DATA = {
-  MONSTER_REF: 'MONSTER_REF',
-} as const;
-
-const AGGRO_RADIUS = TILE_SIZE * 6;
-const MONSTER_SPEED = 100;
-
 // Map pixel color to tile id.
 const PIXEL_TO_TILE: Record<number, TileId> = {
   0x41a6f6: 0,
@@ -73,9 +59,6 @@ const PIXEL_TO_TILE: Record<number, TileId> = {
   0x3b5dc9: 3,
   0xb13e53: 4,
 };
-
-const NEXT_WAVE_SECONDS = 10;
-const MONSTER_HEALTH = 60;
 
 // This will be filled from map.png.
 let map: TileId[][] = [];
@@ -107,24 +90,12 @@ function getVectorBetweenObjects(
 class GameScene extends Phaser.Scene {
   // Player and gameplay
   private player!: ArcWithBody;
-  private playerHealth = 100;
-  private playerIsInvincible = false;
   private keys!: KeyMap;
-  private fireball!: ImageWithBody;
-  private fireballIsCooldown = false;
 
   // UI
   private inventoryCurrHolding = 1;
   private inventoryText!: Phaser.GameObjects.Text;
   private inventoryWoodCount = 0;
-  private healthText!: Phaser.GameObjects.Text;
-  private waveText!: Phaser.GameObjects.Text;
-  private waveNum = 1;
-  private waveMonsterCurrNum = 3;
-  private waveMonsterMaxNum = 3;
-  private isWaveActive = true;
-  private waveCountdown: Phaser.Time.TimerEvent | null = null;
-  private timeNextWave = '0';
 
   // Tiles and blocks
   private blockGroup!: Phaser.Physics.Arcade.StaticGroup;
@@ -132,11 +103,6 @@ class GameScene extends Phaser.Scene {
   private hoverBox!: RectangleWithBody;
   private isInvalidPlacement = false;
   private emitter!: Phaser.GameObjects.Particles.ParticleEmitter;
-  private monsterTiles: Array<[number, number]> = [];
-
-  // Enemies / monsters
-  private monsterGroup!: Phaser.Physics.Arcade.Group;
-  private monsterRadiusGroup!: Phaser.Physics.Arcade.Group;
 
   constructor() {
     super('scene-game');
@@ -146,7 +112,6 @@ class GameScene extends Phaser.Scene {
     this.load.image('tree', './assets/tree.png');
     this.load.image('tree_particle', './assets/tree_particle.png');
     this.load.image('map', './assets/map.png');
-    this.load.image('fireball', './assets/fireball.png');
   }
 
   private buildMapFromImage(textureKey: string): TileId[][] {
@@ -260,174 +225,15 @@ class GameScene extends Phaser.Scene {
     this.treeGroup.add(tree);
   }
 
-  private addMonster(x: number, y: number): void {
-    const monsterWorldPos = gridToWorld(x, y);
-    const monster = this.add.circle(
-      monsterWorldPos.x,
-      monsterWorldPos.y,
-      CIRCLE_SIZE,
-      0xdc143c,
-      1,
-    ) as ArcWithBody;
-
-    monster.setStrokeStyle(2, 0x000000, 1);
-    monster.setDepth(DEPTHS.PLAYER);
-    this.physics.add.existing(monster);
-    this.monsterGroup.add(monster);
-    monster.body.setCollideWorldBounds(true);
-    monster.setData(MONSTER_DATA.IS_AGGRO, false);
-    monster.setData(MONSTER_DATA.HEALTH, MONSTER_HEALTH);
-
-    const aggroRadius = this.add.circle(monster.x, monster.y, AGGRO_RADIUS, 0, 0) as ArcWithBody;
-    this.physics.add.existing(aggroRadius);
-    aggroRadius.body.setCircle(AGGRO_RADIUS);
-    aggroRadius.setData(AGGRO_RADIUS_DATA.MONSTER_REF, monster);
-    this.monsterRadiusGroup.add(aggroRadius);
-  }
-
-  private onPlayerMonsterCollide(
-    playerObject: ArcadeCollisionObject,
-    monsterObject: ArcadeCollisionObject,
-  ): void {
-    const player = playerObject as unknown as ArcWithBody;
-    const monster = monsterObject as unknown as ArcWithBody;
-
-    if (this.playerIsInvincible) {
-      return;
-    }
-
-    this.playerHealth -= 20;
-    this.healthText.setText(`HEALTH: ${this.playerHealth}`);
-
-    if (this.playerHealth <= 0) {
-      resetGame();
-      return;
-    }
-
-    const vec = getVectorBetweenObjects(monster, player, 50);
-
-    this.tweens.add({
-      targets: player,
-      x: player.x + vec.x,
-      y: player.y + vec.y,
-      duration: 100,
-      ease: 'Quad.easeOut',
-    });
-
-    this.playerIsInvincible = true;
-    this.player.setStrokeStyle(2, 0xffffff, 1);
-    this.animateShake(this.healthText);
-
-    this.time.delayedCall(500, () => {
-      this.playerIsInvincible = false;
-      this.player.setStrokeStyle(2, 0x000000, 1);
-    });
-  }
-
-  private onPlayerEnterMonsterRadius(
-    _playerObject: ArcadeCollisionObject,
-    radiusObject: ArcadeCollisionObject,
-  ): void {
-    const radius = radiusObject as unknown as ArcWithBody;
-    const monster = radius.getData(AGGRO_RADIUS_DATA.MONSTER_REF) as ArcWithBody;
-
-    monster.setData(MONSTER_DATA.IS_AGGRO, true);
-  }
-
-  // Group vs Sprite exception:
-  // the two objects are passed in the same order you specified, unless you are
-  // colliding Group vs Sprite, in which case Sprite is always the first parameter.
-  private onMonsterFireballCollide(
-    fireballObject: ArcadeCollisionObject,
-    monsterObject: ArcadeCollisionObject,
-  ): void {
-    const fireball = fireballObject as unknown as ImageWithBody;
-    const monster = monsterObject as unknown as ArcWithBody;
-
-    monster.setData(MONSTER_DATA.IS_AGGRO, true);
-
-    const monsterHealth = (monster.getData(MONSTER_DATA.HEALTH) as number) - 20;
-    monster.setData(MONSTER_DATA.HEALTH, monsterHealth);
-
-    fireball.setVisible(false);
-    fireball.body.enable = false;
-
-    const vec = new Phaser.Math.Vector2().setToPolar(fireball.rotation, 50);
-
-    this.tweens.add({
-      targets: monster,
-      x: monster.x + vec.x,
-      y: monster.y + vec.y,
-      duration: 100,
-      ease: 'Quad.easeOut',
-    });
-
-    monster.setStrokeStyle(2, 0xffffff, 1);
-    this.time.delayedCall(300, () => {
-      monster.setStrokeStyle(2, 0x000000, 1);
-    });
-
-    if (monsterHealth <= 0) {
-      monster.destroy();
-      this.waveMonsterCurrNum -= 1;
-
-      if (this.waveMonsterCurrNum <= 0) {
-        this.endWave();
-      }
-    }
-  }
-
-  private endWave(): void {
-    this.waveNum += 1;
-    this.isWaveActive = false;
-
-    this.waveCountdown = this.time.addEvent({
-      delay: NEXT_WAVE_SECONDS * 1000,
-      callback: () => {
-        this.startWave();
-      },
-      callbackScope: this,
-    });
-  }
-
-  private startWave(): void {
-    this.isWaveActive = true;
-    this.updateWaveText();
-
-    this.waveMonsterMaxNum = Math.min(this.waveNum * 3, this.monsterTiles.length);
-    this.waveMonsterCurrNum = this.waveMonsterMaxNum;
-
-    Phaser.Utils.Array.Shuffle(this.monsterTiles);
-
-    let monsterCount = 0;
-    for (const tile of this.monsterTiles) {
-      if (monsterCount >= this.waveMonsterMaxNum) {
-        break;
-      }
-
-      this.addMonster(tile[0], tile[1]);
-      monsterCount += 1;
-    }
-  }
 
   private updateInventoryText(): void {
     let text = '';
 
     if (this.inventoryCurrHolding === 1) {
-      text = `(1) WOOD: ${this.inventoryWoodCount}\n 2  FIREBALL`;
-    } else if (this.inventoryCurrHolding === 2) {
-      text = ` 1  WOOD: ${this.inventoryWoodCount}\n(2) FIREBALL`;
+      text = `(1) WOOD: ${this.inventoryWoodCount}`;
     }
 
     this.inventoryText.setText(text);
-  }
-
-  private updateWaveText(): void {
-    const text = this.isWaveActive
-      ? `Wave ${this.waveNum}`
-      : `Time next wave: ${this.timeNextWave.padStart(2, ' ')}`;
-
-    this.waveText.setText(text);
   }
 
   create(): void {
@@ -445,8 +251,6 @@ class GameScene extends Phaser.Scene {
     // Groups must exist before addTree() is called.
     this.treeGroup = this.physics.add.staticGroup();
     this.blockGroup = this.physics.add.staticGroup();
-    this.monsterGroup = this.physics.add.group();
-    this.monsterRadiusGroup = this.physics.add.group();
 
     // Red outline box when a tile is hovered.
     this.hoverBox = this.add.rectangle(0, 0, TILE_SIZE, TILE_SIZE, 0x000000, 0) as RectangleWithBody;
@@ -472,6 +276,7 @@ class GameScene extends Phaser.Scene {
             break;
 
           case 1:
+          case 4:
             // Grass
             tileType = 'grass';
             color = 0x77dd77;
@@ -489,13 +294,6 @@ class GameScene extends Phaser.Scene {
             tileType = 'grass';
             color = 0x77dd77;
             PLAYER_POSITION = { x: col, y: row };
-            break;
-
-          case 4:
-            // Monster
-            tileType = 'monsterSpawn';
-            color = 0x5cb85c;
-            this.monsterTiles.push([col, row]);
             break;
         }
 
@@ -600,85 +398,20 @@ class GameScene extends Phaser.Scene {
       .setDepth(DEPTHS.TEXT);
     this.updateInventoryText();
 
-    this.healthText = this.add
-      .text(20, 20, 'HEALTH: 100', {
-        font: '25px Monospace',
-        color: '#000000',
-      })
-      .setScrollFactor(0)
-      .setDepth(DEPTHS.TEXT);
-
-    this.waveText = this.add
-      .text(CANVAS_WIDTH - 20, 20, 'Wave 1', {
-        font: '25px Monospace',
-        color: '#000000',
-      })
-      .setScrollFactor(0)
-      .setDepth(DEPTHS.TEXT)
-      .setOrigin(1, 0);
-
     // Controls.
     this.keys = this.input.keyboard!.addKeys(
-      'W,A,S,D,LEFT,RIGHT,UP,DOWN,R,ONE,TWO,X',
+      'W,A,S,D,LEFT,RIGHT,UP,DOWN,R,ONE,X',
     ) as KeyMap;
-
-    // Fireball.
-    this.fireball = this.add
-      .image(this.player.x, this.player.y, 'fireball')
-      .setDepth(DEPTHS.PLAYER)
-      .setDisplaySize(FIREBALL_SIZE, FIREBALL_SIZE) as ImageWithBody;
-
-    this.textures.get('fireball').setFilter(Phaser.Textures.FilterMode.NEAREST);
-    this.physics.add.existing(this.fireball);
-    this.fireball.setVisible(false);
-    this.fireball.body.enable = false;
-
-    this.input.on('pointerdown', (pointer: Phaser.Input.Pointer) => {
-      if (
-        this.inventoryCurrHolding !== 2 ||
-        !pointer.leftButtonDown() ||
-        this.fireballIsCooldown
-      ) {
-        return;
-      }
-
-      const activePointer = this.input.activePointer.positionToCamera(this.cameras.main) as Phaser.Math.Vector2;
-      const pointerVec = getVectorBetweenObjects(this.player, activePointer, FIREBALL_SPEED);
-
-      this.fireball.setRotation(pointerVec.angle());
-      this.fireball.setPosition(this.player.x, this.player.y);
-      this.fireball.body.setVelocity(pointerVec.x, pointerVec.y);
-
-      this.fireball.setVisible(true);
-      this.fireball.body.enable = true;
-      this.fireballIsCooldown = true;
-
-      // Fireball cooldown.
-      this.time.delayedCall(500, () => {
-        this.fireballIsCooldown = false;
-        this.fireball.setVisible(false);
-        this.fireball.body.enable = false;
-      });
-    });
 
     // Collision.
     this.player.body.setCollideWorldBounds(true);
     this.physics.add.collider(this.player, this.blockGroup);
     this.physics.add.collider(this.player, this.treeGroup);
-    this.physics.add.collider(this.player, this.monsterGroup, this.onPlayerMonsterCollide, undefined, this);
-    this.physics.add.collider(this.monsterGroup, this.blockGroup);
-    this.physics.add.collider(this.monsterGroup, this.monsterGroup);
-    this.physics.add.collider(this.monsterGroup, this.treeGroup);
-    this.physics.add.overlap(this.monsterGroup, this.fireball, this.onMonsterFireballCollide, undefined, this);
-    this.physics.add.overlap(this.player, this.monsterRadiusGroup, this.onPlayerEnterMonsterRadius, undefined, this);
-    this.physics.add.collider(this.fireball, this.blockGroup);
 
     // Camera.
     this.cameras.main.setBounds(-TILE_SIZE / 2, -TILE_SIZE / 2, MAP_WIDTH, MAP_HEIGHT);
     this.cameras.main.startFollow(this.player, true);
     this.cameras.main.setZoom(1);
-
-    this.startWave();
   }
 
   update(): void {
@@ -718,32 +451,14 @@ class GameScene extends Phaser.Scene {
     // Update currently holding.
     if (this.keys.ONE.isDown) {
       this.inventoryCurrHolding = 1;
-    } else if (this.keys.TWO.isDown) {
-      this.inventoryCurrHolding = 2;
     }
     this.updateInventoryText();
 
     // Block placement.
     this.isInvalidPlacement =
       this.physics.overlap(this.player, this.hoverBox) ||
-      this.physics.overlap(this.treeGroup, this.hoverBox) ||
-      this.physics.overlap(this.monsterGroup, this.hoverBox);
+      this.physics.overlap(this.treeGroup, this.hoverBox);
 
-    // Update monsters.
-    this.monsterGroup.getChildren().forEach((monsterObject: Phaser.GameObjects.GameObject) => {
-      const monster = monsterObject as ArcWithBody;
-
-      if (monster.getData(MONSTER_DATA.IS_AGGRO) as boolean) {
-        const monsterVec = getVectorBetweenObjects(monster, this.player, MONSTER_SPEED);
-        monster.body.setVelocity(monsterVec.x, monsterVec.y);
-      }
-    });
-
-    // Update wave text.
-    if (!this.isWaveActive && this.waveCountdown) {
-      this.timeNextWave = this.waveCountdown.getRemainingSeconds().toFixed(0);
-      this.updateWaveText();
-    }
   }
 }
 
