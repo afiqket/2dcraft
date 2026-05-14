@@ -4,7 +4,7 @@ import Phaser from 'phaser';
 type GridPosition = { x: number; y: number };
 type TileId = 0 | 1 | 2 | 3 | 4;
 type TileType = 'water' | 'grass';
-type HasXY = { x: number; y: number };
+// type HasXY = { x: number; y: number };
 
 type ArcadeBody = Phaser.Physics.Arcade.Body;
 type StaticArcadeBody = Phaser.Physics.Arcade.StaticBody;
