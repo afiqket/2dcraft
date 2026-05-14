@@ -89,7 +89,7 @@ function gridToWorld(x: number, y: number): GridPosition {
 
 class GameScene extends Phaser.Scene {
   // Player and gameplay
-  private player!: Phaser.GameObjects.Image;
+  private player!: ImageWithBody;
   private keys!: KeyMap;
 
   // UI
@@ -115,7 +115,7 @@ class GameScene extends Phaser.Scene {
     this.load.image('player_down', './assets/player_down.png');
     this.load.image('player_right', './assets/player_right.png');
     this.load.image('player_left', './assets/player_left.png');
-    this.load.image('player_down', './assets/player_down.png');
+    this.load.image('player_up', './assets/player_up.png');
   }
 
   private buildMapFromImage(textureKey: string): TileId[][] {
@@ -384,6 +384,7 @@ class GameScene extends Phaser.Scene {
     this.textures.get('player_right').setFilter(Phaser.Textures.FilterMode.NEAREST);
     this.player.setDepth(DEPTHS.PLAYER);
     this.physics.add.existing(this.player);
+    this.player.body.setSize(this.player.width/2, this.player.height/2, true);
 
     // Effects.
     this.emitter = this.add
@@ -439,16 +440,20 @@ class GameScene extends Phaser.Scene {
     let velocityX = 0;
     let velocityY = 0;
 
-    if (isLeft) {
-      velocityX = -1;
-    } else if (isRight) {
-      velocityX = 1;
-    }
-
     if (isUp) {
+      this.player.setTexture("player_up")
       velocityY = -1;
     } else if (isDown) {
+      this.player.setTexture("player_down")
       velocityY = 1;
+    }
+
+    if (isLeft) {
+      this.player.setTexture("player_left")
+      velocityX = -1;
+    } else if (isRight) {
+      this.player.setTexture("player_right")
+      velocityX = 1;
     }
 
     const vec = new Phaser.Math.Vector2(velocityX, velocityY)
