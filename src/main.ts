@@ -412,6 +412,7 @@ class GameScene extends Phaser.Scene {
     this.keys = this.input.keyboard!.addKeys(
       'W,A,S,D,LEFT,RIGHT,UP,DOWN,R,ONE,X',
     ) as KeyMap;
+    this.input.setTopOnly(false);
 
     // Collision.
     this.player.body.setCollideWorldBounds(true);
