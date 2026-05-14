@@ -9,7 +9,7 @@ type HasXY = { x: number; y: number };
 type ArcadeBody = Phaser.Physics.Arcade.Body;
 type StaticArcadeBody = Phaser.Physics.Arcade.StaticBody;
 type ArcWithBody = Phaser.GameObjects.Arc & { body: ArcadeBody };
-type ImageWithBody = Phaser.GameObjects.Image & { body: ArcadeBody };
+// type ImageWithBody = Phaser.GameObjects.Image & { body: ArcadeBody };
 type RectangleWithBody = Phaser.GameObjects.Rectangle & {
   body: ArcadeBody | StaticArcadeBody;
 };
@@ -19,11 +19,11 @@ type TransformGameObject =
   Phaser.GameObjects.GameObject &
   Phaser.GameObjects.Components.Transform;
 
-type ArcadeCollisionObject =
-  | Phaser.Types.Physics.Arcade.GameObjectWithBody
-  | Phaser.Physics.Arcade.Body
-  | Phaser.Physics.Arcade.StaticBody
-  | Phaser.Tilemaps.Tile;
+// type ArcadeCollisionObject =
+//   | Phaser.Types.Physics.Arcade.GameObjectWithBody
+//   | Phaser.Physics.Arcade.Body
+//   | Phaser.Physics.Arcade.StaticBody
+//   | Phaser.Tilemaps.Tile;
 
 let game: Phaser.Game;
 
@@ -77,15 +77,15 @@ function gridToWorld(x: number, y: number): GridPosition {
 
 // Finds the vector pointing from obj1 to obj2, scaled.
 // Assumes that the objects have x and y attributes.
-function getVectorBetweenObjects(
-  obj1: HasXY,
-  obj2: HasXY,
-  scale = 1,
-): Phaser.Math.Vector2 {
-  return new Phaser.Math.Vector2(obj2.x - obj1.x, obj2.y - obj1.y)
-    .normalize()
-    .scale(scale);
-}
+// function getVectorBetweenObjects(
+//   obj1: HasXY,
+//   obj2: HasXY,
+//   scale = 1,
+// ): Phaser.Math.Vector2 {
+//   return new Phaser.Math.Vector2(obj2.x - obj1.x, obj2.y - obj1.y)
+//     .normalize()
+//     .scale(scale);
+// }
 
 class GameScene extends Phaser.Scene {
   // Player and gameplay
