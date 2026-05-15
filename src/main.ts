@@ -47,9 +47,10 @@ const TILE_DATA = {
   HOVER_BOX: 'HOVER_BOX',
 } as const;
 
-const TREE_DATA = {
-  HEALTH: 'HEALTH',
-} as const;
+// const TREE_DATA = {
+//   HEALTH: 'HEALTH',
+//   IS_BEING_BROKEN: 'IS_BEING_BROKEN'
+// } as const;
 
 // Map pixel color to tile id.
 const PIXEL_TO_TILE: Record<number, TileId> = {
@@ -63,6 +64,9 @@ const PIXEL_TO_TILE: Record<number, TileId> = {
 const DASH_VELOCITY_SCALE = 3;
 const DASH_TIME_MS = 150;
 const DASH_COOLDOWN_MS = 200;
+
+const BLOCK_BREAK_TIME_MS = 500;
+const BREAK_ANIM_INTERVAL = 250;
 
 
 // This will be filled from map.png.
@@ -98,6 +102,9 @@ class GameScene extends Phaser.Scene {
   private keys!: KeyMap;
   private isPlayerStopInput: boolean = false; 
   private isDashOnCooldown: boolean = false;
+  // private blockCurrentlyBroken!: Phaser.GameObjects.Image | undefined;
+  private breakingTimer!: Phaser.Time.TimerEvent | undefined;
+  private breakingAnimTimer!: Phaser.Time.TimerEvent | undefined
 
   // UI
   private inventoryCurrHolding = 1;
@@ -183,7 +190,7 @@ class GameScene extends Phaser.Scene {
       targets: obj,
       x: objX + 4,
       y: objY - 4,
-      duration: 40,
+      duration: 50,
       yoyo: true,
       repeat: 2,
       onComplete: () => {
@@ -208,7 +215,6 @@ class GameScene extends Phaser.Scene {
       .setDisplaySize(TILE_SIZE, TILE_SIZE);
 
     this.textures.get('tree').setFilter(Phaser.Textures.FilterMode.NEAREST);
-    tree.setData(TREE_DATA.HEALTH, 3);
     tree.setInteractive();
 
     tree.on('pointerdown', (pointer: Phaser.Input.Pointer) => {
@@ -220,20 +226,61 @@ class GameScene extends Phaser.Scene {
         return;
       }
 
-      const treeHealth = (tree.getData(TREE_DATA.HEALTH) as number) - 1;
-      tree.setData(TREE_DATA.HEALTH, treeHealth);
-
+      this.startBreaking(tree);
       this.animateBreaking(tree);
+      this.breakingAnimTimer = this.time.addEvent({
+        delay: BREAK_ANIM_INTERVAL,
+        loop: true,
+        callback: () => {
+          if (!tree.active) {
+            this.cancelBreaking();
+            return;
+          }
 
-      if (treeHealth <= 0) {
-        tree.destroy();
-        this.animateShake(this.inventoryText);
-        this.inventoryWoodCount += 2;
-        this.updateInventoryText();
-      }
+          this.animateBreaking(tree);
+        },
+      });
+    });
+
+
+    tree.on("pointerup", () => {
+      this.cancelBreaking();
+    });
+
+    tree.on("pointerout", () => {
+      this.cancelBreaking();
     });
 
     this.treeGroup.add(tree);
+  }
+
+  private startBreaking(block: Phaser.GameObjects.Image) {
+    this.cancelBreaking()
+    // this.blockCurrentlyBroken = block;
+
+    this.breakingTimer = this.time.delayedCall(BLOCK_BREAK_TIME_MS, () => {
+      block.destroy();
+      // this.blockCurrentlyBroken = undefined;
+      this.breakingTimer = undefined;
+
+      this.animateShake(this.inventoryText);
+      this.inventoryWoodCount += 2;
+      this.updateInventoryText();
+  });
+  }
+
+  private cancelBreaking() {
+    if (this.breakingTimer) {
+      this.breakingTimer.remove(false);
+      this.breakingTimer = undefined;
+    }
+
+    if (this.breakingAnimTimer) {
+      this.breakingAnimTimer.remove(false);
+      this.breakingAnimTimer = undefined;
+    } 
+
+    // this.blockCurrentlyBroken = undefined;
   }
 
 
