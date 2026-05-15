@@ -60,6 +60,11 @@ const PIXEL_TO_TILE: Record<number, TileId> = {
   0xb13e53: 4,
 };
 
+const DASH_VELOCITY_SCALE = 3;
+const DASH_TIME_MS = 150;
+const DASH_COOLDOWN_MS = 200;
+
+
 // This will be filled from map.png.
 let map: TileId[][] = [];
 
@@ -91,6 +96,8 @@ class GameScene extends Phaser.Scene {
   // Player and gameplay
   private player!: ImageWithBody;
   private keys!: KeyMap;
+  private isPlayerStopInput: boolean = false; 
+  private isDashOnCooldown: boolean = false;
 
   // UI
   private inventoryCurrHolding = 1;
@@ -410,9 +417,36 @@ class GameScene extends Phaser.Scene {
 
     // Controls.
     this.keys = this.input.keyboard!.addKeys(
-      'W,A,S,D,LEFT,RIGHT,UP,DOWN,R,ONE,X',
+      'W,A,S,D,LEFT,RIGHT,UP,DOWN,R,ONE,X,SPACE',
     ) as KeyMap;
     this.input.setTopOnly(false);
+    this.input.keyboard!.on('keydown-SPACE', () => {
+      if (this.isDashOnCooldown) {
+        return;
+      }
+
+      const velocityX = this.player.body.velocity.x
+      const velocityY = this.player.body.velocity.y
+
+      this.isDashOnCooldown = true;
+      this.isPlayerStopInput = true;
+
+
+      this.player.body.setVelocity(
+        velocityX * DASH_VELOCITY_SCALE, 
+        velocityY * DASH_VELOCITY_SCALE
+      );
+
+      // Dash movement
+      this.time.delayedCall(DASH_TIME_MS, () => {
+        this.isPlayerStopInput = false;
+      });
+
+      // Dash cooldown.
+      this.time.delayedCall(DASH_COOLDOWN_MS, () => {
+        this.isDashOnCooldown = false;
+      });
+    });
 
     // Collision.
     this.player.body.setCollideWorldBounds(true);
@@ -432,36 +466,38 @@ class GameScene extends Phaser.Scene {
       return;
     }
 
-    // Player movement.
-    const isUp = this.keys.UP.isDown || this.keys.W.isDown;
-    const isLeft = this.keys.LEFT.isDown || this.keys.A.isDown;
-    const isDown = this.keys.DOWN.isDown || this.keys.S.isDown;
-    const isRight = this.keys.RIGHT.isDown || this.keys.D.isDown;
+    if (!this.isPlayerStopInput) {
+      // Player movement.
+      const isUp = this.keys.UP.isDown || this.keys.W.isDown;
+      const isLeft = this.keys.LEFT.isDown || this.keys.A.isDown;
+      const isDown = this.keys.DOWN.isDown || this.keys.S.isDown;
+      const isRight = this.keys.RIGHT.isDown || this.keys.D.isDown;
 
-    let velocityX = 0;
-    let velocityY = 0;
+      let velocityX = 0;
+      let velocityY = 0;
 
-    if (isUp) {
-      this.player.setTexture("player_up")
-      velocityY = -1;
-    } else if (isDown) {
-      this.player.setTexture("player_down")
-      velocityY = 1;
+      if (isUp) {
+        this.player.setTexture("player_up")
+        velocityY = -1;
+      } else if (isDown) {
+        this.player.setTexture("player_down")
+        velocityY = 1;
+      }
+
+      if (isLeft) {
+        this.player.setTexture("player_left")
+        velocityX = -1;
+      } else if (isRight) {
+        this.player.setTexture("player_right")
+        velocityX = 1;
+      }
+
+      const vec = new Phaser.Math.Vector2(velocityX, velocityY)
+        .normalize()
+        .scale(PLAYER_SPEED);
+
+      this.player.body.setVelocity(vec.x, vec.y);
     }
-
-    if (isLeft) {
-      this.player.setTexture("player_left")
-      velocityX = -1;
-    } else if (isRight) {
-      this.player.setTexture("player_right")
-      velocityX = 1;
-    }
-
-    const vec = new Phaser.Math.Vector2(velocityX, velocityY)
-      .normalize()
-      .scale(PLAYER_SPEED);
-
-    this.player.body.setVelocity(vec.x, vec.y);
 
     // Update currently holding.
     if (this.keys.ONE.isDown) {
