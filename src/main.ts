@@ -1,11 +1,13 @@
 import './style.css';
 import Phaser from 'phaser';
 
+
+// ==================== TYPES ====================
+
 type GridPosition = { x: number; y: number };
 type TileId = 0 | 1 | 2 | 3 | 4;
 type TileType = 'water' | 'grass';
 // type HasXY = { x: number; y: number };
-
 type ArcadeBody = Phaser.Physics.Arcade.Body;
 type StaticArcadeBody = Phaser.Physics.Arcade.StaticBody;
 // type ArcWithBody = Phaser.GameObjects.Arc & { body: ArcadeBody };
@@ -14,18 +16,17 @@ type RectangleWithBody = Phaser.GameObjects.Rectangle & {
   body: ArcadeBody | StaticArcadeBody;
 };
 type KeyMap = Record<string, Phaser.Input.Keyboard.Key>;
-
 type TransformGameObject =
   Phaser.GameObjects.GameObject &
   Phaser.GameObjects.Components.Transform;
-
 // type ArcadeCollisionObject =
 //   | Phaser.Types.Physics.Arcade.GameObjectWithBody
 //   | Phaser.Physics.Arcade.Body
 //   | Phaser.Physics.Arcade.StaticBody
 //   | Phaser.Tilemaps.Tile;
 
-let game: Phaser.Game;
+
+// ==================== CONSTANTS ====================
 
 const CANVAS_WIDTH = 500;
 const CANVAS_HEIGHT = 500;
@@ -68,7 +69,6 @@ const DASH_COOLDOWN_MS = 200;
 const BLOCK_BREAK_TIME_MS = 500;
 const BREAK_ANIM_INTERVAL = 250;
 
-
 // This will be filled from map.png.
 let map: TileId[][] = [];
 
@@ -76,13 +76,6 @@ let MAP_WIDTH = 0;
 let MAP_HEIGHT = 0;
 
 let PLAYER_POSITION: GridPosition | null = null;
-
-function gridToWorld(x: number, y: number): GridPosition {
-  return {
-    x: x * TILE_SIZE,
-    y: y * TILE_SIZE,
-  };
-}
 
 // Finds the vector pointing from obj1 to obj2, scaled.
 // Assumes that the objects have x and y attributes.
@@ -95,6 +88,8 @@ function gridToWorld(x: number, y: number): GridPosition {
 //     .normalize()
 //     .scale(scale);
 // }
+
+// ==================== GAME SCENE ====================
 
 class GameScene extends Phaser.Scene {
   // Player and gameplay
@@ -122,17 +117,14 @@ class GameScene extends Phaser.Scene {
     super('scene-game');
   }
 
-  preload(): void {
-    this.load.image('tree', './assets/tree.png');
-    this.load.image('tree_particle', './assets/tree_particle.png');
-    this.load.image('map', './assets/map.png');
-    this.load.image('player_down', './assets/player_down.png');
-    this.load.image('player_right', './assets/player_right.png');
-    this.load.image('player_left', './assets/player_left.png');
-    this.load.image('player_up', './assets/player_up.png');
+  private _gridToWorld(x: number, y: number): GridPosition {
+    return {
+      x: x * TILE_SIZE,
+      y: y * TILE_SIZE,
+    };
   }
 
-  private buildMapFromImage(textureKey: string): TileId[][] {
+  private _buildMapFromImage(textureKey: string): TileId[][] {
     const sourceImage = this.textures
       .get(textureKey)
       .getSourceImage() as HTMLImageElement | HTMLCanvasElement;
@@ -182,7 +174,7 @@ class GameScene extends Phaser.Scene {
     return result;
   }
 
-  private animateShake(obj: TransformGameObject): void {
+  private _animateShake(obj: TransformGameObject): void {
     const objX = obj.x;
     const objY = obj.y;
 
@@ -200,15 +192,15 @@ class GameScene extends Phaser.Scene {
     });
   }
 
-  private animateBreaking(obj: TransformGameObject): void {
+  private _animateBreaking(obj: TransformGameObject): void {
     this.emitter.startFollow(obj);
     this.emitter.start();
 
-    this.animateShake(obj);
+    this._animateShake(obj);
   }
 
-  private addTree(x: number, y: number): void {
-    const treeWorld = gridToWorld(x, y);
+  private _addTree(x: number, y: number): void {
+    const treeWorld = this._gridToWorld(x, y);
     const tree = this.add
       .image(treeWorld.x, treeWorld.y, 'tree')
       .setDepth(DEPTHS.BLOCKS)
@@ -226,36 +218,36 @@ class GameScene extends Phaser.Scene {
         return;
       }
 
-      this.startBreaking(tree);
-      this.animateBreaking(tree);
+      this._startBreaking(tree);
+      this._animateBreaking(tree);
       this.breakingAnimTimer = this.time.addEvent({
         delay: BREAK_ANIM_INTERVAL,
         loop: true,
         callback: () => {
           if (!tree.active) {
-            this.cancelBreaking();
+            this._cancelBreaking();
             return;
           }
 
-          this.animateBreaking(tree);
+          this._animateBreaking(tree);
         },
       });
     });
 
 
     tree.on("pointerup", () => {
-      this.cancelBreaking();
+      this._cancelBreaking();
     });
 
     tree.on("pointerout", () => {
-      this.cancelBreaking();
+      this._cancelBreaking();
     });
 
     this.treeGroup.add(tree);
   }
 
-  private startBreaking(block: Phaser.GameObjects.Image) {
-    this.cancelBreaking()
+  private _startBreaking(block: Phaser.GameObjects.Image) {
+    this._cancelBreaking()
     // this.blockCurrentlyBroken = block;
 
     this.breakingTimer = this.time.delayedCall(BLOCK_BREAK_TIME_MS, () => {
@@ -263,13 +255,13 @@ class GameScene extends Phaser.Scene {
       // this.blockCurrentlyBroken = undefined;
       this.breakingTimer = undefined;
 
-      this.animateShake(this.inventoryText);
+      this._animateShake(this.inventoryText);
       this.inventoryWoodCount += 2;
-      this.updateInventoryText();
+      this._updateInventoryText();
   });
   }
 
-  private cancelBreaking() {
+  private _cancelBreaking() {
     if (this.breakingTimer) {
       this.breakingTimer.remove(false);
       this.breakingTimer = undefined;
@@ -284,7 +276,7 @@ class GameScene extends Phaser.Scene {
   }
 
 
-  private updateInventoryText(): void {
+  private _updateInventoryText(): void {
     let text = '';
 
     if (this.inventoryCurrHolding === 1) {
@@ -294,9 +286,19 @@ class GameScene extends Phaser.Scene {
     this.inventoryText.setText(text);
   }
 
+  preload(): void {
+    this.load.image('tree', './assets/tree.png');
+    this.load.image('tree_particle', './assets/tree_particle.png');
+    this.load.image('map', './assets/map.png');
+    this.load.image('player_down', './assets/player_down.png');
+    this.load.image('player_right', './assets/player_right.png');
+    this.load.image('player_left', './assets/player_left.png');
+    this.load.image('player_up', './assets/player_up.png');
+  }
+
   create(): void {
     // Build map from map.png.
-    map = this.buildMapFromImage('map');
+    map = this._buildMapFromImage('map');
     MAP_WIDTH = map[0].length * TILE_SIZE;
     MAP_HEIGHT = map.length * TILE_SIZE;
 
@@ -344,7 +346,7 @@ class GameScene extends Phaser.Scene {
             // Tree
             tileType = 'grass';
             color = 0x77dd77;
-            this.addTree(col, row);
+            this._addTree(col, row);
             break;
 
           case 3:
@@ -355,7 +357,7 @@ class GameScene extends Phaser.Scene {
             break;
         }
 
-        const { x, y } = gridToWorld(col, row);
+        const { x, y } = this._gridToWorld(col, row);
 
         const tile = this.add.rectangle(x, y, TILE_SIZE, TILE_SIZE, color, 1) as RectangleWithBody;
         tile.setStrokeStyle(1, 0x444444, 1);
@@ -393,16 +395,16 @@ class GameScene extends Phaser.Scene {
             this.blockGroup.add(block);
 
             this.inventoryWoodCount -= 1;
-            this.updateInventoryText();
+            this._updateInventoryText();
           } else if (pointer.leftButtonDown()) {
             const block = tile.getData(TILE_DATA.BLOCK) as RectangleWithBody | null;
 
             if (block) {
-              this.animateBreaking(block);
+              this._animateBreaking(block);
 
               this.inventoryWoodCount += 1;
-              this.updateInventoryText();
-              this.animateShake(this.inventoryText);
+              this._updateInventoryText();
+              this._animateShake(this.inventoryText);
               block.destroy();
               tile.setData(TILE_DATA.BLOCK, null);
             }
@@ -428,7 +430,7 @@ class GameScene extends Phaser.Scene {
     }
 
     // Player.
-    const playerWorld = gridToWorld(PLAYER_POSITION.x, PLAYER_POSITION.y);
+    const playerWorld = this._gridToWorld(PLAYER_POSITION.x, PLAYER_POSITION.y);
     this.player = this.add.image(playerWorld.x, playerWorld.y,'player_down')
       .setDisplaySize(PLAYER_SIZE, PLAYER_SIZE) as ImageWithBody;
 
@@ -438,7 +440,7 @@ class GameScene extends Phaser.Scene {
     this.textures.get('player_right').setFilter(Phaser.Textures.FilterMode.NEAREST);
     this.player.setDepth(DEPTHS.PLAYER);
     this.physics.add.existing(this.player);
-    this.player.body.setSize(this.player.width/2, this.player.height/2, true);
+    this.player.body.setSize(this.player.width/3, this.player.height/3, true);
 
     // Effects.
     this.emitter = this.add
@@ -460,7 +462,7 @@ class GameScene extends Phaser.Scene {
       })
       .setScrollFactor(0)
       .setDepth(DEPTHS.TEXT);
-    this.updateInventoryText();
+    this._updateInventoryText();
 
     // Controls.
     this.keys = this.input.keyboard!.addKeys(
@@ -550,7 +552,7 @@ class GameScene extends Phaser.Scene {
     if (this.keys.ONE.isDown) {
       this.inventoryCurrHolding = 1;
     }
-    this.updateInventoryText();
+    this._updateInventoryText();
 
     // Block placement.
     this.isInvalidPlacement =
@@ -559,6 +561,8 @@ class GameScene extends Phaser.Scene {
 
   }
 }
+
+// ==================== MAIN ====================
 
 const gameCanvas = document.getElementById('gameCanvas') as HTMLCanvasElement | null;
 
@@ -576,7 +580,7 @@ const config: Phaser.Types.Core.GameConfig = {
   scene: [GameScene],
 };
 
-game = new Phaser.Game(config);
+let game: Phaser.Game = new Phaser.Game(config);
 
 function resetGame(): void {
   game.destroy(false);
