@@ -24,7 +24,10 @@ type TransformGameObject =
 //   | Phaser.Physics.Arcade.Body
 //   | Phaser.Physics.Arcade.StaticBody
 //   | Phaser.Tilemaps.Tile;
-
+type Tile = RectangleWithBody & {
+  tileType: TileType,
+  block: RectangleWithBody | null,
+}
 
 // ==================== CONSTANTS ====================
 
@@ -41,17 +44,6 @@ const DEPTHS = {
   PLAYER: 30,
   TEXT: 100,
 } as const;
-
-const TILE_DATA = {
-  TILE_TYPE: 'TILE_TYPE',
-  BLOCK: 'BLOCK',
-  HOVER_BOX: 'HOVER_BOX',
-} as const;
-
-// const TREE_DATA = {
-//   HEALTH: 'HEALTH',
-//   IS_BEING_BROKEN: 'IS_BEING_BROKEN'
-// } as const;
 
 // Map pixel color to tile id.
 const PIXEL_TO_TILE: Record<number, TileId> = {
@@ -359,14 +351,13 @@ class GameScene extends Phaser.Scene {
 
         const { x, y } = this._gridToWorld(col, row);
 
-        const tile = this.add.rectangle(x, y, TILE_SIZE, TILE_SIZE, color, 1) as RectangleWithBody;
+        const tile = this.add.rectangle(x, y, TILE_SIZE, TILE_SIZE, color, 1) as Tile;
         tile.setStrokeStyle(1, 0x444444, 1);
 
         this.physics.add.existing(tile, true);
 
-        tile.setData(TILE_DATA.TILE_TYPE, tileType);
-        tile.setData(TILE_DATA.BLOCK, null);
-        tile.setData(TILE_DATA.HOVER_BOX, null);
+        tile.tileType = tileType;
+        tile.block = null;
 
         // Required for mouse click events.
         tile.setInteractive();
@@ -378,7 +369,7 @@ class GameScene extends Phaser.Scene {
 
           if (pointer.rightButtonDown()) {
             if (
-              tile.getData(TILE_DATA.BLOCK) ||
+              tile.block ||
               this.isInvalidPlacement ||
               this.inventoryWoodCount === 0
             ) {
@@ -389,7 +380,7 @@ class GameScene extends Phaser.Scene {
               .rectangle(tile.x, tile.y, TILE_SIZE, TILE_SIZE, 0x895129, 1)
               .setDepth(DEPTHS.BLOCKS) as RectangleWithBody;
 
-            tile.setData(TILE_DATA.BLOCK, block);
+            tile.block = block;
 
             this.physics.add.existing(block, true);
             this.blockGroup.add(block);
@@ -397,7 +388,7 @@ class GameScene extends Phaser.Scene {
             this.inventoryWoodCount -= 1;
             this._updateInventoryText();
           } else if (pointer.leftButtonDown()) {
-            const block = tile.getData(TILE_DATA.BLOCK) as RectangleWithBody | null;
+            const block = tile.block as RectangleWithBody | null;
 
             if (block) {
               this._animateBreaking(block);
@@ -406,7 +397,7 @@ class GameScene extends Phaser.Scene {
               this._updateInventoryText();
               this._animateShake(this.inventoryText);
               block.destroy();
-              tile.setData(TILE_DATA.BLOCK, null);
+              tile.block = null;
             }
           }
         });
