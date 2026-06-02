@@ -6,7 +6,7 @@ import Phaser from 'phaser';
 
 type GridPosition = { x: number; y: number };
 type TileId = 0 | 1 | 2 | 3 | 4;
-type TileType = 'water' | 'grass';
+type Floor = 'water' | 'grass';
 // type HasXY = { x: number; y: number };
 type ArcadeBody = Phaser.Physics.Arcade.Body;
 type StaticArcadeBody = Phaser.Physics.Arcade.StaticBody;
@@ -25,7 +25,7 @@ type TransformGameObject =
 //   | Phaser.Physics.Arcade.StaticBody
 //   | Phaser.Tilemaps.Tile;
 type Tile = RectangleWithBody & {
-  tileType: TileType,
+  floor: Floor,
   block: RectangleWithBody | null,
 }
 
@@ -67,7 +67,7 @@ let map: TileId[][] = [];
 let MAP_WIDTH = 0;
 let MAP_HEIGHT = 0;
 
-let PLAYER_POSITION: GridPosition | null = null;
+let playerSpawnPosition: GridPosition | null = null;
 
 // Finds the vector pointing from obj1 to obj2, scaled.
 // Assumes that the objects have x and y attributes.
@@ -94,7 +94,7 @@ class GameScene extends Phaser.Scene {
   private breakingAnimTimer!: Phaser.Time.TimerEvent | undefined
 
   // UI
-  private inventoryCurrHolding = 1;
+  // private inventoryCurrHolding = 1;
   private inventoryText!: Phaser.GameObjects.Text;
   private inventoryWoodCount = 0;
 
@@ -202,9 +202,9 @@ class GameScene extends Phaser.Scene {
     tree.setInteractive();
 
     tree.on('pointerdown', (pointer: Phaser.Input.Pointer) => {
-      if (this.inventoryCurrHolding !== 1) {
-        return;
-      }
+      // if (this.inventoryCurrHolding !== 1) {
+      //   return;
+      // }
 
       if (pointer.rightButtonDown()) {
         return;
@@ -271,9 +271,9 @@ class GameScene extends Phaser.Scene {
   private _updateInventoryText(): void {
     let text = '';
 
-    if (this.inventoryCurrHolding === 1) {
+    // if (this.inventoryCurrHolding === 1) {
       text = `(1) WOOD: ${this.inventoryWoodCount}`;
-    }
+    // }
 
     this.inventoryText.setText(text);
   }
@@ -317,35 +317,35 @@ class GameScene extends Phaser.Scene {
     for (let row = 0; row < map.length; row++) {
       for (let col = 0; col < map[row].length; col++) {
         const tileId = map[row][col];
-        let tileType: TileType = 'grass';
+        let floor: Floor = 'grass';
         let color = 0x77dd77;
 
         switch (tileId) {
           case 0:
             // Water
-            tileType = 'water';
+            floor = 'water';
             color = 0x4f92d4;
             break;
 
           case 1:
           case 4:
             // Grass
-            tileType = 'grass';
+            floor = 'grass';
             color = 0x77dd77;
             break;
 
           case 2:
             // Tree
-            tileType = 'grass';
+            floor = 'grass';
             color = 0x77dd77;
             this._addTree(col, row);
             break;
 
           case 3:
             // Player
-            tileType = 'grass';
+            floor = 'grass';
             color = 0x77dd77;
-            PLAYER_POSITION = { x: col, y: row };
+            playerSpawnPosition = { x: col, y: row };
             break;
         }
 
@@ -356,18 +356,19 @@ class GameScene extends Phaser.Scene {
 
         this.physics.add.existing(tile, true);
 
-        tile.tileType = tileType;
+        tile.floor = floor;
         tile.block = null;
 
         // Required for mouse click events.
         tile.setInteractive();
 
         tile.on('pointerdown', (pointer: Phaser.Input.Pointer) => {
-          if (this.inventoryCurrHolding !== 1) {
-            return;
-          }
+          // if (this.inventoryCurrHolding !== 1) {
+          //   return;
+          // }
 
           if (pointer.rightButtonDown()) {
+            // Place
             if (
               tile.block ||
               this.isInvalidPlacement ||
@@ -416,12 +417,12 @@ class GameScene extends Phaser.Scene {
       }
     }
 
-    if (!PLAYER_POSITION) {
+    if (!playerSpawnPosition) {
       throw new Error('No player spawn tile found in map.png. Use color 0x3B5DC9.');
     }
 
     // Player.
-    const playerWorld = this._gridToWorld(PLAYER_POSITION.x, PLAYER_POSITION.y);
+    const playerWorld = this._gridToWorld(playerSpawnPosition.x, playerSpawnPosition.y);
     this.player = this.add.image(playerWorld.x, playerWorld.y,'player_down')
       .setDisplaySize(PLAYER_SIZE, PLAYER_SIZE) as ImageWithBody;
 
@@ -540,9 +541,9 @@ class GameScene extends Phaser.Scene {
     }
 
     // Update currently holding.
-    if (this.keys.ONE.isDown) {
-      this.inventoryCurrHolding = 1;
-    }
+    // if (this.keys.ONE.isDown) {
+    //   this.inventoryCurrHolding = 1;
+    // }
     this._updateInventoryText();
 
     // Block placement.
