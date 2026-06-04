@@ -58,24 +58,28 @@ class Grid {
 }
 
 class Inventory {
-  private woodCount = 0;
+  public wood = 0;
   private onChangedCallbacks: (() => void)[] = [];
 
-  getWoodCount(): number {
-    return this.woodCount;
+  hasWood(amount: number): boolean {
+    return this.wood >= amount;
   }
 
   addWood(amount: number): void {
-    this.woodCount += amount;
+    if (amount <= 0) {
+      return;
+    }
+
+    this.wood += amount;
     this.notifyChanged();
   }
 
-  removeWood(amount: number): boolean {
-    if (this.woodCount < amount) {
+  spendWood(amount: number): boolean {
+    if (amount <= 0 || !this.hasWood(amount)) {
       return false;
     }
 
-    this.woodCount -= amount;
+    this.wood -= amount;
     this.notifyChanged();
     return true;
   }
@@ -187,7 +191,7 @@ class GameEffects {
 }
 
 class InventoryUI {
-  private text: Phaser.GameObjects.Text;
+  readonly text: Phaser.GameObjects.Text;
 
   constructor(
     private scene: Phaser.Scene,
@@ -208,12 +212,8 @@ class InventoryUI {
     this.updateText();
   }
 
-  getTextObject(): Phaser.GameObjects.Text {
-    return this.text;
-  }
-
   updateText(): void {
-    this.text.setText(`WOOD: ${this.inventory.getWoodCount()}`);
+    this.text.setText(`WOOD: ${this.inventory.wood}`);
   }
 }
 
@@ -222,7 +222,7 @@ class BuildUI {
   private titleText: Phaser.GameObjects.Text;
   private floorText: Phaser.GameObjects.Text;
   private blockText: Phaser.GameObjects.Text;
-  private selectedItem: BuildItem = 'wooden_floor';
+  public selectedItem: BuildItem = 'wooden_floor';
 
   constructor(private scene: Phaser.Scene) {
     const bg = this.scene.add.rectangle(180, 80, 320, 110, 0xffffff, 0.9);
@@ -259,17 +259,9 @@ class BuildUI {
     this.container.setVisible(false);
   }
 
-  isVisible(): boolean {
-    return this.container.visible;
-  }
-
   selectItem(item: BuildItem): void {
     this.selectedItem = item;
     this.updateText();
-  }
-
-  getSelectedItem(): BuildItem {
-    return this.selectedItem;
   }
 
   private updateText(): void {
@@ -298,14 +290,10 @@ class GameUI {
 
     this.buildUI.hide();
   }
-
-  getSelectedBuildItem(): BuildItem {
-    return this.buildUI.getSelectedItem();
-  }
 }
 
 class Player {
-  private sprite: ImageWithBody;
+  readonly sprite: ImageWithBody;
   private isInputStopped = false;
   private isDashOnCooldown = false;
 
@@ -326,10 +314,6 @@ class Player {
     this.inputManager.onDash(() => {
       this.dash();
     });
-  }
-
-  getSprite(): ImageWithBody {
-    return this.sprite;
   }
 
   update(): void {
@@ -383,7 +367,7 @@ class Player {
 
 abstract class Floor {
   abstract readonly kind: FloorKind;
-  protected rect: RectangleWithBody;
+  readonly gameObject: RectangleWithBody;
 
   constructor(
     protected scene: Phaser.Scene,
@@ -394,17 +378,13 @@ abstract class Floor {
   ) {
     const world = Grid.toWorld(gridX, gridY);
 
-    this.rect = this.scene.add
+    this.gameObject = this.scene.add
       .rectangle(world.x, world.y, TILE_SIZE, TILE_SIZE, color, 1)
       .setStrokeStyle(1, strokeColor, 1)
       .setDepth(DEPTHS.FLOORS) as RectangleWithBody;
 
-    this.scene.physics.add.existing(this.rect, true);
-    this.rect.setInteractive();
-  }
-
-  getGameObject(): RectangleWithBody {
-    return this.rect;
+    this.scene.physics.add.existing(this.gameObject, true);
+    this.gameObject.setInteractive();
   }
 
   canSupportBlock(): boolean {
@@ -416,7 +396,7 @@ abstract class Floor {
   }
 
   destroy(): void {
-    this.rect.destroy();
+    this.gameObject.destroy();
   }
 }
 
@@ -461,21 +441,21 @@ abstract class Block {
 
   constructor(protected onDestroyed: (block: Block) => void) {}
 
-  abstract getGameObject(): TransformGameObject;
+  abstract readonly gameObject: TransformGameObject;
 
   canBeBrokenByBuildTool(): boolean {
     return false;
   }
 
   destroy(): void {
-    this.getGameObject().destroy();
+    this.gameObject.destroy();
     this.onDestroyed(this);
   }
 }
 
 class WoodenBlock extends Block {
   readonly kind = 'wooden_block' as const;
-  private rect: RectangleWithBody;
+  readonly gameObject: RectangleWithBody;
 
   constructor(
     scene: Phaser.Scene,
@@ -488,16 +468,12 @@ class WoodenBlock extends Block {
 
     const world = Grid.toWorld(gridX, gridY);
 
-    this.rect = scene.add
+    this.gameObject = scene.add
       .rectangle(world.x, world.y, TILE_SIZE, TILE_SIZE, 0x895129, 1)
       .setDepth(DEPTHS.BLOCKS) as RectangleWithBody;
 
-    scene.physics.add.existing(this.rect, true);
-    blockGroup.add(this.rect);
-  }
-
-  getGameObject(): RectangleWithBody {
-    return this.rect;
+    scene.physics.add.existing(this.gameObject, true);
+    blockGroup.add(this.gameObject);
   }
 
   canBeBrokenByBuildTool(): boolean {
@@ -507,7 +483,7 @@ class WoodenBlock extends Block {
 
 class TreeBlock extends Block {
   readonly kind = 'tree' as const;
-  private sprite: ImageWithStaticBody;
+  readonly gameObject: ImageWithStaticBody;
   private breakingTimer: Phaser.Time.TimerEvent | undefined;
   private breakingAnimTimer: Phaser.Time.TimerEvent | undefined;
 
@@ -525,15 +501,15 @@ class TreeBlock extends Block {
 
     const world = Grid.toWorld(gridX, gridY);
 
-    this.sprite = this.scene.add
+    this.gameObject = this.scene.add
       .image(world.x, world.y, 'tree')
       .setDepth(DEPTHS.BLOCKS)
       .setDisplaySize(TILE_SIZE, TILE_SIZE) as ImageWithStaticBody;
 
-    this.sprite.setInteractive();
-    blockGroup.add(this.sprite);
+    this.gameObject.setInteractive();
+    blockGroup.add(this.gameObject);
 
-    this.sprite.on('pointerdown', (pointer: Phaser.Input.Pointer) => {
+    this.gameObject.on('pointerdown', (pointer: Phaser.Input.Pointer) => {
       if (pointer.rightButtonDown()) {
         return;
       }
@@ -541,42 +517,38 @@ class TreeBlock extends Block {
       this.startBreaking();
     });
 
-    this.sprite.on('pointerup', () => {
+    this.gameObject.on('pointerup', () => {
       this.cancelBreaking();
     });
 
-    this.sprite.on('pointerout', () => {
+    this.gameObject.on('pointerout', () => {
       this.cancelBreaking();
     });
-  }
-
-  getGameObject(): ImageWithStaticBody {
-    return this.sprite;
   }
 
   private startBreaking(): void {
     this.cancelBreaking();
 
-    this.effects.breaking(this.sprite);
+    this.effects.breaking(this.gameObject);
 
     this.breakingTimer = this.scene.time.delayedCall(BLOCK_BREAK_TIME_MS, () => {
       this.destroy();
       this.breakingTimer = undefined;
 
       this.inventory.addWood(2);
-      this.effects.shake(this.inventoryUI.getTextObject());
+      this.effects.shake(this.inventoryUI.text);
     });
 
     this.breakingAnimTimer = this.scene.time.addEvent({
       delay: BREAK_ANIM_INTERVAL,
       loop: true,
       callback: () => {
-        if (!this.sprite.active) {
+        if (!this.gameObject.active) {
           this.cancelBreaking();
           return;
         }
 
-        this.effects.breaking(this.sprite);
+        this.effects.breaking(this.gameObject);
       },
     });
   }
@@ -595,7 +567,7 @@ class TreeBlock extends Block {
 }
 
 class Tile {
-  private block: Block | null = null;
+  public block: Block | null = null;
   private pointerDownCallbacks: ((pointer: Phaser.Input.Pointer, tile: Tile) => void)[] = [];
   private pointerOverCallbacks: ((tile: Tile) => void)[] = [];
   private pointerOutCallbacks: ((tile: Tile) => void)[] = [];
@@ -604,25 +576,9 @@ class Tile {
     private scene: Phaser.Scene,
     public readonly gridX: number,
     public readonly gridY: number,
-    private floor: Floor,
+    public floor: Floor,
   ) {
     this.bindInputToFloor();
-  }
-
-  getFloor(): Floor {
-    return this.floor;
-  }
-
-  getFloorKind(): FloorKind {
-    return this.floor.kind;
-  }
-
-  getFloorGameObject(): RectangleWithBody {
-    return this.floor.getGameObject();
-  }
-
-  getBlock(): Block | null {
-    return this.block;
   }
 
   hasBlock(): boolean {
@@ -685,7 +641,7 @@ class Tile {
   }
 
   private bindInputToFloor(): void {
-    const floorObj = this.floor.getGameObject();
+    const floorObj = this.floor.gameObject;
 
     floorObj.removeAllListeners('pointerdown');
     floorObj.removeAllListeners('pointerover');
@@ -712,36 +668,28 @@ class Tile {
 }
 
 class HoverBox {
-  private rect: RectangleWithBody;
+  readonly gameObject: RectangleWithBody;
 
   constructor(private scene: Phaser.Scene) {
-    this.rect = this.scene.add
+    this.gameObject = this.scene.add
       .rectangle(0, 0, TILE_SIZE, TILE_SIZE, 0x000000, 0)
       .setStrokeStyle(2, 0xff0000, 1)
       .setDepth(DEPTHS.HOVER)
       .setVisible(false) as RectangleWithBody;
 
-    this.scene.physics.add.existing(this.rect, true);
-  }
-
-  getGameObject(): RectangleWithBody {
-    return this.rect;
-  }
-
-  isVisible(): boolean {
-    return this.rect.visible;
+    this.scene.physics.add.existing(this.gameObject, true);
   }
 
   showAt(tile: Tile): void {
-    const tileObj = tile.getFloorGameObject();
+    const tileObj = tile.floor.gameObject;
 
-    this.rect.setPosition(tileObj.x, tileObj.y);
-    this.rect.setVisible(true);
-    this.rect.body.updateFromGameObject();
+    this.gameObject.setPosition(tileObj.x, tileObj.y);
+    this.gameObject.setVisible(true);
+    this.gameObject.body.updateFromGameObject();
   }
 
   hide(): void {
-    this.rect.setVisible(false);
+    this.gameObject.setVisible(false);
   }
 }
 
@@ -803,8 +751,8 @@ class MapLoader {
 class GameWorld {
   private tiles: Tile[] = [];
   private map: TileId[][] = [];
-  private mapWidth = 0;
-  private mapHeight = 0;
+  public width = 0;
+  public height = 0;
   private playerSpawnPosition: GridPosition | null = null;
   private hoveredTile: Tile | null = null;
   private isInvalidPlacement = false;
@@ -828,14 +776,14 @@ class GameWorld {
     const mapLoader = new MapLoader(this.scene);
 
     this.map = mapLoader.buildFromImage('map');
-    this.mapWidth = this.map[0].length * TILE_SIZE;
-    this.mapHeight = this.map.length * TILE_SIZE;
+    this.width = this.map[0].length * TILE_SIZE;
+    this.height = this.map.length * TILE_SIZE;
 
     this.scene.physics.world.setBounds(
       -TILE_SIZE / 2,
       -TILE_SIZE / 2,
-      this.mapWidth,
-      this.mapHeight,
+      this.width,
+      this.height,
     );
 
     for (let row = 0; row < this.map.length; row++) {
@@ -851,18 +799,6 @@ class GameWorld {
     return Grid.toWorld(this.playerSpawnPosition.x, this.playerSpawnPosition.y);
   }
 
-  getWidth(): number {
-    return this.mapWidth;
-  }
-
-  getHeight(): number {
-    return this.mapHeight;
-  }
-
-  getHoveredTile(): Tile | null {
-    return this.hoveredTile;
-  }
-
   setMode(mode: GameMode): void {
     this.mode = mode;
   }
@@ -873,8 +809,8 @@ class GameWorld {
 
   updatePlacementState(player: Player): void {
     this.isInvalidPlacement =
-      this.hoverBox.isVisible() &&
-      this.scene.physics.overlap(player.getSprite(), this.hoverBox.getGameObject());
+      this.hoverBox.gameObject.visible &&
+      this.scene.physics.overlap(player.sprite, this.hoverBox.gameObject);
   }
 
   private createTileFromId(col: number, row: number, tileId: TileId): void {
@@ -982,20 +918,20 @@ class GameWorld {
     if (
       tile.hasBlock() ||
       !tile.canReplaceFloorWithWoodenFloor() ||
-      this.inventory.getWoodCount() === 0
+      !this.inventory.hasWood(1)
     ) {
       return;
     }
 
     tile.replaceFloor(new WoodenFloor(this.scene, tile.gridX, tile.gridY));
-    this.inventory.removeWood(1);
+    this.inventory.spendWood(1);
   }
 
   private tryPlaceWoodenBlock(tile: Tile): void {
     if (
       !tile.canPlaceBlock() ||
       this.isInvalidPlacement ||
-      this.inventory.getWoodCount() === 0
+      !this.inventory.hasWood(1)
     ) {
       return;
     }
@@ -1011,21 +947,21 @@ class GameWorld {
     );
 
     tile.setBlock(block);
-    this.inventory.removeWood(1);
+    this.inventory.spendWood(1);
   }
 
   private tryBreakBlock(tile: Tile): void {
-    const block = tile.getBlock();
+    const block = tile.block;
 
     if (!block || !block.canBeBrokenByBuildTool()) {
       return;
     }
 
-    this.effects.breaking(block.getGameObject());
+    this.effects.breaking(block.gameObject);
     tile.destroyBlock();
 
     this.inventory.addWood(1);
-    this.effects.shake(this.ui.inventoryUI.getTextObject());
+    this.effects.shake(this.ui.inventoryUI.text);
   }
 }
 
@@ -1057,16 +993,16 @@ class GameManager {
     const playerSpawn = this.world.build();
     this.player = new Player(this.scene, this.inputManager, playerSpawn);
 
-    this.scene.physics.add.collider(this.player.getSprite(), this.world.blockGroup);
+    this.scene.physics.add.collider(this.player.sprite, this.world.blockGroup);
 
     this.scene.cameras.main.setBounds(
       -TILE_SIZE / 2,
       -TILE_SIZE / 2,
-      this.world.getWidth(),
-      this.world.getHeight(),
+      this.world.width,
+      this.world.height,
     );
 
-    this.scene.cameras.main.startFollow(this.player.getSprite(), true);
+    this.scene.cameras.main.startFollow(this.player.sprite, true);
     this.scene.cameras.main.setZoom(1);
   }
 
@@ -1091,7 +1027,7 @@ class GameManager {
       }
 
       this.ui.buildUI.selectItem('wooden_floor');
-      this.world.setSelectedBuildItem(this.ui.getSelectedBuildItem());
+      this.world.setSelectedBuildItem(this.ui.buildUI.selectedItem);
     });
 
     this.inputManager.onSelectWoodenBlock(() => {
@@ -1100,7 +1036,7 @@ class GameManager {
       }
 
       this.ui.buildUI.selectItem('wooden_block');
-      this.world.setSelectedBuildItem(this.ui.getSelectedBuildItem());
+      this.world.setSelectedBuildItem(this.ui.buildUI.selectedItem);
     });
   }
 
@@ -1109,7 +1045,7 @@ class GameManager {
 
     this.ui.setMode(this.mode);
     this.world.setMode(this.mode);
-    this.world.setSelectedBuildItem(this.ui.getSelectedBuildItem());
+    this.world.setSelectedBuildItem(this.ui.buildUI.selectedItem);
   }
 
   private setTextureFilters(): void {
