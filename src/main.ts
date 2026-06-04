@@ -1,16 +1,11 @@
 import './style.css';
 import Phaser from 'phaser';
 
-
-// ==================== TYPES ====================
-
 type GridPosition = { x: number; y: number };
 type TileId = 0 | 1 | 2 | 3 | 4;
 type Floor = 'water' | 'grass';
-// type HasXY = { x: number; y: number };
 type ArcadeBody = Phaser.Physics.Arcade.Body;
 type StaticArcadeBody = Phaser.Physics.Arcade.StaticBody;
-// type ArcWithBody = Phaser.GameObjects.Arc & { body: ArcadeBody };
 type ImageWithBody = Phaser.GameObjects.Image & { body: ArcadeBody };
 type RectangleWithBody = Phaser.GameObjects.Rectangle & {
   body: ArcadeBody | StaticArcadeBody;
@@ -19,17 +14,6 @@ type KeyMap = Record<string, Phaser.Input.Keyboard.Key>;
 type TransformGameObject =
   Phaser.GameObjects.GameObject &
   Phaser.GameObjects.Components.Transform;
-// type ArcadeCollisionObject =
-//   | Phaser.Types.Physics.Arcade.GameObjectWithBody
-//   | Phaser.Physics.Arcade.Body
-//   | Phaser.Physics.Arcade.StaticBody
-//   | Phaser.Tilemaps.Tile;
-type Tile = RectangleWithBody & {
-  floor: Floor,
-  block: RectangleWithBody | null,
-}
-
-// ==================== CONSTANTS ====================
 
 const CANVAS_WIDTH = 500;
 const CANVAS_HEIGHT = 500;
@@ -45,7 +29,6 @@ const DEPTHS = {
   TEXT: 100,
 } as const;
 
-// Map pixel color to tile id.
 const PIXEL_TO_TILE: Record<number, TileId> = {
   0x41a6f6: 0,
   0xa7f070: 1,
@@ -61,63 +44,393 @@ const DASH_COOLDOWN_MS = 200;
 const BLOCK_BREAK_TIME_MS = 500;
 const BREAK_ANIM_INTERVAL = 250;
 
-// This will be filled from map.png.
-let map: TileId[][] = [];
-
-let MAP_WIDTH = 0;
-let MAP_HEIGHT = 0;
-
-let playerSpawnPosition: GridPosition | null = null;
-
-// Finds the vector pointing from obj1 to obj2, scaled.
-// Assumes that the objects have x and y attributes.
-// function getVectorBetweenObjects(
-//   obj1: HasXY,
-//   obj2: HasXY,
-//   scale = 1,
-// ): Phaser.Math.Vector2 {
-//   return new Phaser.Math.Vector2(obj2.x - obj1.x, obj2.y - obj1.y)
-//     .normalize()
-//     .scale(scale);
-// }
-
-// ==================== GAME SCENE ====================
-
-class GameScene extends Phaser.Scene {
-  // Player and gameplay
-  private player!: ImageWithBody;
-  private keys!: KeyMap;
-  private isPlayerStopInput: boolean = false; 
-  private isDashOnCooldown: boolean = false;
-  // private blockCurrentlyBroken!: Phaser.GameObjects.Image | undefined;
-  private breakingTimer!: Phaser.Time.TimerEvent | undefined;
-  private breakingAnimTimer!: Phaser.Time.TimerEvent | undefined
-
-  // UI
-  // private inventoryCurrHolding = 1;
-  private inventoryText!: Phaser.GameObjects.Text;
-  private inventoryWoodCount = 0;
-
-  // Tiles and blocks
-  private blockGroup!: Phaser.Physics.Arcade.StaticGroup;
-  private treeGroup!: Phaser.Physics.Arcade.StaticGroup;
-  private hoverBox!: RectangleWithBody;
-  private isInvalidPlacement = false;
-  private emitter!: Phaser.GameObjects.Particles.ParticleEmitter;
-
-  constructor() {
-    super('scene-game');
-  }
-
-  private _gridToWorld(x: number, y: number): GridPosition {
+class Grid {
+  static toWorld(x: number, y: number): GridPosition {
     return {
       x: x * TILE_SIZE,
       y: y * TILE_SIZE,
     };
   }
+}
 
-  private _buildMapFromImage(textureKey: string): TileId[][] {
-    const sourceImage = this.textures
+class GameEffects {
+  private emitter: Phaser.GameObjects.Particles.ParticleEmitter;
+
+  constructor(private scene: Phaser.Scene) {
+    this.emitter = this.scene.add
+      .particles(0, 0, 'tree_particle', {
+        speed: 300,
+        lifespan: 150,
+        gravityY: 1000,
+        scale: 1,
+        duration: 100,
+        emitting: false,
+      })
+      .setDepth(DEPTHS.PLAYER);
+  }
+
+  shake(obj: TransformGameObject): void {
+    const objX = obj.x;
+    const objY = obj.y;
+
+    this.scene.tweens.add({
+      targets: obj,
+      x: objX + 4,
+      y: objY - 4,
+      duration: 50,
+      yoyo: true,
+      repeat: 2,
+      onComplete: () => {
+        obj.x = objX;
+        obj.y = objY;
+      },
+    });
+  }
+
+  breaking(obj: TransformGameObject): void {
+    this.emitter.startFollow(obj);
+    this.emitter.start();
+    this.shake(obj);
+  }
+}
+
+class InventoryUI {
+  private text: Phaser.GameObjects.Text;
+  private woodCount = 0;
+
+  constructor(private scene: Phaser.Scene) {
+    this.text = this.scene.add
+      .text(20, CANVAS_HEIGHT - 60, '', {
+        font: '25px Monospace',
+        color: '#000000',
+      })
+      .setScrollFactor(0)
+      .setDepth(DEPTHS.TEXT);
+
+    this.updateText();
+  }
+
+  getTextObject(): Phaser.GameObjects.Text {
+    return this.text;
+  }
+
+  getWoodCount(): number {
+    return this.woodCount;
+  }
+
+  addWood(amount: number): void {
+    this.woodCount += amount;
+    this.updateText();
+  }
+
+  removeWood(amount: number): boolean {
+    if (this.woodCount < amount) {
+      return false;
+    }
+
+    this.woodCount -= amount;
+    this.updateText();
+    return true;
+  }
+
+  private updateText(): void {
+    this.text.setText(`(1) WOOD: ${this.woodCount}`);
+  }
+}
+
+
+class Player {
+  private sprite: ImageWithBody;
+  private keys: KeyMap;
+  private isInputStopped = false;
+  private isDashOnCooldown = false;
+
+  constructor(private scene: Phaser.Scene, spawn: GridPosition) {
+    this.sprite = this.scene.add
+      .image(spawn.x, spawn.y, 'player_down')
+      .setDisplaySize(PLAYER_SIZE, PLAYER_SIZE)
+      .setDepth(DEPTHS.PLAYER) as ImageWithBody;
+
+    this.scene.physics.add.existing(this.sprite);
+    this.sprite.body.setSize(this.sprite.width / 3, this.sprite.height / 3, true);
+    this.sprite.body.setCollideWorldBounds(true);
+
+    this.keys = this.scene.input.keyboard!.addKeys(
+      'W,A,S,D,LEFT,RIGHT,UP,DOWN,R,ONE,TWO,X,SPACE',
+    ) as KeyMap;
+
+    this.scene.input.keyboard!.on('keydown-SPACE', () => {
+      this.dash();
+    });
+  }
+
+  getSprite(): ImageWithBody {
+    return this.sprite;
+  }
+
+  isResetPressed(): boolean {
+    return this.keys.R.isDown;
+  }
+
+  update(): void {
+    if (this.keys.ONE.isDown) {
+
+    }
+    this.keys.TWO.isDown
+
+    if (this.isInputStopped) {
+      return;
+    }
+
+    const isUp = this.keys.UP.isDown || this.keys.W.isDown;
+    const isLeft = this.keys.LEFT.isDown || this.keys.A.isDown;
+    const isDown = this.keys.DOWN.isDown || this.keys.S.isDown;
+    const isRight = this.keys.RIGHT.isDown || this.keys.D.isDown;
+
+    let velocityX = 0;
+    let velocityY = 0;
+
+    if (isUp) {
+      this.sprite.setTexture('player_up');
+      velocityY = -1;
+    } else if (isDown) {
+      this.sprite.setTexture('player_down');
+      velocityY = 1;
+    }
+
+    if (isLeft) {
+      this.sprite.setTexture('player_left');
+      velocityX = -1;
+    } else if (isRight) {
+      this.sprite.setTexture('player_right');
+      velocityX = 1;
+    }
+
+    const vec = new Phaser.Math.Vector2(velocityX, velocityY)
+      .normalize()
+      .scale(PLAYER_SPEED);
+
+    this.sprite.body.setVelocity(vec.x, vec.y);
+  }
+
+  private dash(): void {
+    if (this.isDashOnCooldown) {
+      return;
+    }
+
+    const velocityX = this.sprite.body.velocity.x;
+    const velocityY = this.sprite.body.velocity.y;
+
+    this.isDashOnCooldown = true;
+    this.isInputStopped = true;
+
+    this.sprite.body.setVelocity(
+      velocityX * DASH_VELOCITY_SCALE,
+      velocityY * DASH_VELOCITY_SCALE,
+    );
+
+    this.scene.time.delayedCall(DASH_TIME_MS, () => {
+      this.isInputStopped = false;
+    });
+
+    this.scene.time.delayedCall(DASH_COOLDOWN_MS, () => {
+      this.isDashOnCooldown = false;
+    });
+  }
+}
+
+class Tile {
+  private rect: RectangleWithBody;
+  private block: RectangleWithBody | null = null;
+
+  constructor(
+    private scene: Phaser.Scene,
+    public readonly gridX: number,
+    public readonly gridY: number,
+    public readonly floor: Floor,
+    color: number,
+  ) {
+    const world = Grid.toWorld(gridX, gridY);
+
+    this.rect = this.scene.add
+      .rectangle(world.x, world.y, TILE_SIZE, TILE_SIZE, color, 1)
+      .setStrokeStyle(1, 0x444444, 1)
+      .setDepth(DEPTHS.TILES) as RectangleWithBody;
+
+    this.scene.physics.add.existing(this.rect, true);
+    this.rect.setInteractive();
+  }
+
+  getGameObject(): RectangleWithBody {
+    return this.rect;
+  }
+
+  getBlock(): RectangleWithBody | null {
+    return this.block;
+  }
+
+  hasBlock(): boolean {
+    return this.block !== null;
+  }
+
+  placeBlock(blockGroup: Phaser.Physics.Arcade.StaticGroup): RectangleWithBody {
+    const block = this.scene.add
+      .rectangle(this.rect.x, this.rect.y, TILE_SIZE, TILE_SIZE, 0x895129, 1)
+      .setDepth(DEPTHS.BLOCKS) as RectangleWithBody;
+
+    this.scene.physics.add.existing(block, true);
+    blockGroup.add(block);
+
+    this.block = block;
+    return block;
+  }
+
+  destroyBlock(): RectangleWithBody | null {
+    if (!this.block) {
+      return null;
+    }
+
+    const oldBlock = this.block;
+    oldBlock.destroy();
+    this.block = null;
+
+    return oldBlock;
+  }
+
+  onPointerDown(callback: (pointer: Phaser.Input.Pointer, tile: Tile) => void): void {
+    this.rect.on('pointerdown', (pointer: Phaser.Input.Pointer) => {
+      callback(pointer, this);
+    });
+  }
+
+  onPointerOver(callback: (tile: Tile) => void): void {
+    this.rect.on('pointerover', () => {
+      callback(this);
+    });
+  }
+
+  onPointerOut(callback: (tile: Tile) => void): void {
+    this.rect.on('pointerout', () => {
+      callback(this);
+    });
+  }
+}
+
+class HoverBox {
+  private rect: RectangleWithBody;
+
+  constructor(private scene: Phaser.Scene) {
+    this.rect = this.scene.add
+      .rectangle(0, 0, TILE_SIZE, TILE_SIZE, 0x000000, 0)
+      .setStrokeStyle(2, 0xff0000, 1)
+      .setDepth(DEPTHS.HOVER)
+      .setVisible(false) as RectangleWithBody;
+
+    this.scene.physics.add.existing(this.rect, true);
+  }
+
+  getGameObject(): RectangleWithBody {
+    return this.rect;
+  }
+
+  showAt(tile: Tile): void {
+    const tileObj = tile.getGameObject();
+
+    this.rect.setPosition(tileObj.x, tileObj.y);
+    this.rect.setVisible(true);
+    this.rect.body.updateFromGameObject();
+  }
+
+  hide(): void {
+    this.rect.setVisible(false);
+  }
+}
+
+class Tree {
+  private sprite: Phaser.GameObjects.Image;
+  private breakingTimer: Phaser.Time.TimerEvent | undefined;
+  private breakingAnimTimer: Phaser.Time.TimerEvent | undefined;
+
+  constructor(
+    private scene: Phaser.Scene,
+    private effects: GameEffects,
+    private inventory: InventoryUI,
+    x: number,
+    y: number,
+    treeGroup: Phaser.Physics.Arcade.StaticGroup,
+  ) {
+    const world = Grid.toWorld(x, y);
+
+    this.sprite = this.scene.add
+      .image(world.x, world.y, 'tree')
+      .setDepth(DEPTHS.BLOCKS)
+      .setDisplaySize(TILE_SIZE, TILE_SIZE);
+
+    this.sprite.setInteractive();
+    treeGroup.add(this.sprite);
+
+    this.sprite.on('pointerdown', (pointer: Phaser.Input.Pointer) => {
+      if (pointer.rightButtonDown()) {
+        return;
+      }
+
+      this.startBreaking();
+    });
+
+    this.sprite.on('pointerup', () => {
+      this.cancelBreaking();
+    });
+
+    this.sprite.on('pointerout', () => {
+      this.cancelBreaking();
+    });
+  }
+
+  private startBreaking(): void {
+    this.cancelBreaking();
+
+    this.effects.breaking(this.sprite);
+
+    this.breakingTimer = this.scene.time.delayedCall(BLOCK_BREAK_TIME_MS, () => {
+      this.sprite.destroy();
+      this.breakingTimer = undefined;
+
+      this.inventory.addWood(2);
+      this.effects.shake(this.inventory.getTextObject());
+    });
+
+    this.breakingAnimTimer = this.scene.time.addEvent({
+      delay: BREAK_ANIM_INTERVAL,
+      loop: true,
+      callback: () => {
+        if (!this.sprite.active) {
+          this.cancelBreaking();
+          return;
+        }
+
+        this.effects.breaking(this.sprite);
+      },
+    });
+  }
+
+  private cancelBreaking(): void {
+    if (this.breakingTimer) {
+      this.breakingTimer.remove(false);
+      this.breakingTimer = undefined;
+    }
+
+    if (this.breakingAnimTimer) {
+      this.breakingAnimTimer.remove(false);
+      this.breakingAnimTimer = undefined;
+    }
+  }
+}
+
+class MapLoader {
+  constructor(private scene: Phaser.Scene) {}
+
+  buildFromImage(textureKey: string): TileId[][] {
+    const sourceImage = this.scene.textures
       .get(textureKey)
       .getSourceImage() as HTMLImageElement | HTMLCanvasElement;
 
@@ -126,6 +439,7 @@ class GameScene extends Phaser.Scene {
     canvas.height = sourceImage.height;
 
     const ctx = canvas.getContext('2d', { willReadFrequently: true });
+
     if (!ctx) {
       throw new Error('Could not create 2D canvas context.');
     }
@@ -165,117 +479,221 @@ class GameScene extends Phaser.Scene {
 
     return result;
   }
+}
 
-  private _animateShake(obj: TransformGameObject): void {
-    const objX = obj.x;
-    const objY = obj.y;
+class GameWorld {
+  private tiles: Tile[] = [];
+  private map: TileId[][] = [];
+  private mapWidth = 0;
+  private mapHeight = 0;
+  private playerSpawnPosition: GridPosition | null = null;
+  private isInvalidPlacement = false;
 
-    this.tweens.add({
-      targets: obj,
-      x: objX + 4,
-      y: objY - 4,
-      duration: 50,
-      yoyo: true,
-      repeat: 2,
-      onComplete: () => {
-        obj.x = objX;
-        obj.y = objY;
-      },
-    });
+  readonly blockGroup: Phaser.Physics.Arcade.StaticGroup;
+  readonly treeGroup: Phaser.Physics.Arcade.StaticGroup;
+  readonly hoverBox: HoverBox;
+
+  constructor(
+    private scene: Phaser.Scene,
+    private effects: GameEffects,
+    private inventory: InventoryUI,
+  ) {
+    this.blockGroup = this.scene.physics.add.staticGroup();
+    this.treeGroup = this.scene.physics.add.staticGroup();
+    this.hoverBox = new HoverBox(this.scene);
   }
 
-  private _animateBreaking(obj: TransformGameObject): void {
-    this.emitter.startFollow(obj);
-    this.emitter.start();
+  build(): GridPosition {
+    const mapLoader = new MapLoader(this.scene);
 
-    this._animateShake(obj);
-  }
+    this.map = mapLoader.buildFromImage('map');
+    this.mapWidth = this.map[0].length * TILE_SIZE;
+    this.mapHeight = this.map.length * TILE_SIZE;
 
-  private _addTree(x: number, y: number): void {
-    const treeWorld = this._gridToWorld(x, y);
-    const tree = this.add
-      .image(treeWorld.x, treeWorld.y, 'tree')
-      .setDepth(DEPTHS.BLOCKS)
-      .setDisplaySize(TILE_SIZE, TILE_SIZE);
+    this.scene.physics.world.setBounds(
+      -TILE_SIZE / 2,
+      -TILE_SIZE / 2,
+      this.mapWidth,
+      this.mapHeight,
+    );
 
-    this.textures.get('tree').setFilter(Phaser.Textures.FilterMode.NEAREST);
-    tree.setInteractive();
-
-    tree.on('pointerdown', (pointer: Phaser.Input.Pointer) => {
-      // if (this.inventoryCurrHolding !== 1) {
-      //   return;
-      // }
-
-      if (pointer.rightButtonDown()) {
-        return;
+    for (let row = 0; row < this.map.length; row++) {
+      for (let col = 0; col < this.map[row].length; col++) {
+        this.createTileFromId(col, row, this.map[row][col]);
       }
-
-      this._startBreaking(tree);
-      this._animateBreaking(tree);
-      this.breakingAnimTimer = this.time.addEvent({
-        delay: BREAK_ANIM_INTERVAL,
-        loop: true,
-        callback: () => {
-          if (!tree.active) {
-            this._cancelBreaking();
-            return;
-          }
-
-          this._animateBreaking(tree);
-        },
-      });
-    });
-
-
-    tree.on("pointerup", () => {
-      this._cancelBreaking();
-    });
-
-    tree.on("pointerout", () => {
-      this._cancelBreaking();
-    });
-
-    this.treeGroup.add(tree);
-  }
-
-  private _startBreaking(block: Phaser.GameObjects.Image) {
-    this._cancelBreaking()
-    // this.blockCurrentlyBroken = block;
-
-    this.breakingTimer = this.time.delayedCall(BLOCK_BREAK_TIME_MS, () => {
-      block.destroy();
-      // this.blockCurrentlyBroken = undefined;
-      this.breakingTimer = undefined;
-
-      this._animateShake(this.inventoryText);
-      this.inventoryWoodCount += 2;
-      this._updateInventoryText();
-  });
-  }
-
-  private _cancelBreaking() {
-    if (this.breakingTimer) {
-      this.breakingTimer.remove(false);
-      this.breakingTimer = undefined;
     }
 
-    if (this.breakingAnimTimer) {
-      this.breakingAnimTimer.remove(false);
-      this.breakingAnimTimer = undefined;
-    } 
+    if (!this.playerSpawnPosition) {
+      throw new Error('No player spawn tile found in map.png. Use color 0x3B5DC9.');
+    }
 
-    // this.blockCurrentlyBroken = undefined;
+    return Grid.toWorld(this.playerSpawnPosition.x, this.playerSpawnPosition.y);
   }
 
+  getWidth(): number {
+    return this.mapWidth;
+  }
 
-  private _updateInventoryText(): void {
-    let text = '';
+  getHeight(): number {
+    return this.mapHeight;
+  }
 
-    // if (this.inventoryCurrHolding === 1) {
-      text = `(1) WOOD: ${this.inventoryWoodCount}`;
-    // }
+  updatePlacementState(player: Player): void {
+    this.isInvalidPlacement =
+      this.scene.physics.overlap(player.getSprite(), this.hoverBox.getGameObject()) ||
+      this.scene.physics.overlap(this.treeGroup, this.hoverBox.getGameObject());
+  }
 
-    this.inventoryText.setText(text);
+  private createTileFromId(col: number, row: number, tileId: TileId): void {
+    let floor: Floor = 'grass';
+    let color = 0x77dd77;
+
+    switch (tileId) {
+      case 0:
+        floor = 'water';
+        color = 0x4f92d4;
+        break;
+
+      case 1:
+      case 4:
+        floor = 'grass';
+        color = 0x77dd77;
+        break;
+
+      case 2:
+        floor = 'grass';
+        color = 0x77dd77;
+        new Tree(this.scene, this.effects, this.inventory, col, row, this.treeGroup);
+        break;
+
+      case 3:
+        floor = 'grass';
+        color = 0x77dd77;
+        this.playerSpawnPosition = { x: col, y: row };
+        break;
+    }
+
+    const tile = new Tile(this.scene, col, row, floor, color);
+
+    tile.onPointerDown((pointer, selectedTile) => {
+      this.handleTileClick(pointer, selectedTile);
+    });
+
+    tile.onPointerOver((selectedTile) => {
+      this.hoverBox.showAt(selectedTile);
+    });
+
+    tile.onPointerOut(() => {
+      this.hoverBox.hide();
+    });
+
+    this.tiles.push(tile);
+  }
+
+  private handleTileClick(pointer: Phaser.Input.Pointer, tile: Tile): void {
+    if (pointer.rightButtonDown()) {
+      this.tryPlaceBlock(tile);
+      return;
+    }
+
+    if (pointer.leftButtonDown()) {
+      this.tryBreakBlock(tile);
+    }
+  }
+
+  private tryPlaceBlock(tile: Tile): void {
+    if (
+      tile.hasBlock() ||
+      this.isInvalidPlacement ||
+      this.inventory.getWoodCount() === 0
+    ) {
+      return;
+    }
+
+    tile.placeBlock(this.blockGroup);
+    this.inventory.removeWood(1);
+  }
+
+  private tryBreakBlock(tile: Tile): void {
+    const block = tile.getBlock();
+
+    if (!block) {
+      return;
+    }
+
+    this.effects.breaking(block);
+    tile.destroyBlock();
+
+    this.inventory.addWood(1);
+    this.effects.shake(this.inventory.getTextObject());
+  }
+}
+
+class GameManager {
+  private effects!: GameEffects;
+  private inventory!: InventoryUI;
+  private world!: GameWorld;
+  private player!: Player;
+
+  constructor(private scene: Phaser.Scene) {}
+
+  create(): void {
+    this.scene.input.mouse?.disableContextMenu();
+    this.scene.input.setTopOnly(false);
+
+    this.setTextureFilters();
+
+    this.effects = new GameEffects(this.scene);
+    this.inventory = new InventoryUI(this.scene);
+    this.world = new GameWorld(this.scene, this.effects, this.inventory);
+
+    const playerSpawn = this.world.build();
+    this.player = new Player(this.scene, playerSpawn);
+
+    this.scene.physics.add.collider(this.player.getSprite(), this.world.blockGroup);
+    this.scene.physics.add.collider(this.player.getSprite(), this.world.treeGroup);
+
+    this.scene.cameras.main.setBounds(
+      -TILE_SIZE / 2,
+      -TILE_SIZE / 2,
+      this.world.getWidth(),
+      this.world.getHeight(),
+    );
+
+    this.scene.cameras.main.startFollow(this.player.getSprite(), true);
+    this.scene.cameras.main.setZoom(1);
+  }
+
+  update(): void {
+    if (this.player.isResetPressed()) {
+      resetGame();
+      return;
+    }
+
+    this.player.update();
+    this.world.updatePlacementState(this.player);
+  }
+
+  private setTextureFilters(): void {
+    const textureKeys = [
+      'tree',
+      'player_down',
+      'player_up',
+      'player_left',
+      'player_right',
+    ];
+
+    for (const key of textureKeys) {
+      this.scene.textures.get(key).setFilter(Phaser.Textures.FilterMode.NEAREST);
+    }
+  }
+}
+
+class GameScene extends Phaser.Scene {
+  private manager!: GameManager;
+
+  constructor() {
+    super('scene-game');
   }
 
   preload(): void {
@@ -289,272 +707,14 @@ class GameScene extends Phaser.Scene {
   }
 
   create(): void {
-    // Build map from map.png.
-    map = this._buildMapFromImage('map');
-    MAP_WIDTH = map[0].length * TILE_SIZE;
-    MAP_HEIGHT = map.length * TILE_SIZE;
-
-    // Disable normal right click.
-    this.input.mouse?.disableContextMenu();
-
-    // Map bounds.
-    this.physics.world.setBounds(-TILE_SIZE / 2, -TILE_SIZE / 2, MAP_WIDTH, MAP_HEIGHT);
-
-    // Groups must exist before addTree() is called.
-    this.treeGroup = this.physics.add.staticGroup();
-    this.blockGroup = this.physics.add.staticGroup();
-
-    // Red outline box when a tile is hovered.
-    this.hoverBox = this.add.rectangle(0, 0, TILE_SIZE, TILE_SIZE, 0x000000, 0) as RectangleWithBody;
-    this.hoverBox
-      .setStrokeStyle(2, 0xff0000, 1)
-      .setDepth(DEPTHS.HOVER)
-      .setVisible(false);
-
-    this.physics.add.existing(this.hoverBox, true);
-
-    // Convert map.png to game map data.
-    for (let row = 0; row < map.length; row++) {
-      for (let col = 0; col < map[row].length; col++) {
-        const tileId = map[row][col];
-        let floor: Floor = 'grass';
-        let color = 0x77dd77;
-
-        switch (tileId) {
-          case 0:
-            // Water
-            floor = 'water';
-            color = 0x4f92d4;
-            break;
-
-          case 1:
-          case 4:
-            // Grass
-            floor = 'grass';
-            color = 0x77dd77;
-            break;
-
-          case 2:
-            // Tree
-            floor = 'grass';
-            color = 0x77dd77;
-            this._addTree(col, row);
-            break;
-
-          case 3:
-            // Player
-            floor = 'grass';
-            color = 0x77dd77;
-            playerSpawnPosition = { x: col, y: row };
-            break;
-        }
-
-        const { x, y } = this._gridToWorld(col, row);
-
-        const tile = this.add.rectangle(x, y, TILE_SIZE, TILE_SIZE, color, 1) as Tile;
-        tile.setStrokeStyle(1, 0x444444, 1);
-
-        this.physics.add.existing(tile, true);
-
-        tile.floor = floor;
-        tile.block = null;
-
-        // Required for mouse click events.
-        tile.setInteractive();
-
-        tile.on('pointerdown', (pointer: Phaser.Input.Pointer) => {
-          // if (this.inventoryCurrHolding !== 1) {
-          //   return;
-          // }
-
-          if (pointer.rightButtonDown()) {
-            // Place
-            if (
-              tile.block ||
-              this.isInvalidPlacement ||
-              this.inventoryWoodCount === 0
-            ) {
-              return;
-            }
-
-            const block = this.add
-              .rectangle(tile.x, tile.y, TILE_SIZE, TILE_SIZE, 0x895129, 1)
-              .setDepth(DEPTHS.BLOCKS) as RectangleWithBody;
-
-            tile.block = block;
-
-            this.physics.add.existing(block, true);
-            this.blockGroup.add(block);
-
-            this.inventoryWoodCount -= 1;
-            this._updateInventoryText();
-          } else if (pointer.leftButtonDown()) {
-            const block = tile.block as RectangleWithBody | null;
-
-            if (block) {
-              this._animateBreaking(block);
-
-              this.inventoryWoodCount += 1;
-              this._updateInventoryText();
-              this._animateShake(this.inventoryText);
-              block.destroy();
-              tile.block = null;
-            }
-          }
-        });
-
-        tile.on('pointerover', () => {
-          this.hoverBox.setPosition(tile.x, tile.y);
-          this.hoverBox.setVisible(true);
-          this.hoverBox.body.updateFromGameObject();
-        });
-
-        tile.on('pointerout', () => {
-          this.hoverBox.setVisible(false);
-        });
-
-        tile.setDepth(DEPTHS.TILES);
-      }
-    }
-
-    if (!playerSpawnPosition) {
-      throw new Error('No player spawn tile found in map.png. Use color 0x3B5DC9.');
-    }
-
-    // Player.
-    const playerWorld = this._gridToWorld(playerSpawnPosition.x, playerSpawnPosition.y);
-    this.player = this.add.image(playerWorld.x, playerWorld.y,'player_down')
-      .setDisplaySize(PLAYER_SIZE, PLAYER_SIZE) as ImageWithBody;
-
-    this.textures.get('player_down').setFilter(Phaser.Textures.FilterMode.NEAREST);
-    this.textures.get('player_up').setFilter(Phaser.Textures.FilterMode.NEAREST);
-    this.textures.get('player_left').setFilter(Phaser.Textures.FilterMode.NEAREST);
-    this.textures.get('player_right').setFilter(Phaser.Textures.FilterMode.NEAREST);
-    this.player.setDepth(DEPTHS.PLAYER);
-    this.physics.add.existing(this.player);
-    this.player.body.setSize(this.player.width/3, this.player.height/3, true);
-
-    // Effects.
-    this.emitter = this.add
-      .particles(0, 0, 'tree_particle', {
-        speed: 300,
-        lifespan: 150,
-        gravityY: 1000,
-        scale: 1,
-        duration: 100,
-        emitting: false,
-      })
-      .setDepth(DEPTHS.PLAYER);
-
-    // Text.
-    this.inventoryText = this.add
-      .text(20, CANVAS_HEIGHT - 60, '', {
-        font: '25px Monospace',
-        color: '#000000',
-      })
-      .setScrollFactor(0)
-      .setDepth(DEPTHS.TEXT);
-    this._updateInventoryText();
-
-    // Controls.
-    this.keys = this.input.keyboard!.addKeys(
-      'W,A,S,D,LEFT,RIGHT,UP,DOWN,R,ONE,X,SPACE',
-    ) as KeyMap;
-    this.input.setTopOnly(false);
-    this.input.keyboard!.on('keydown-SPACE', () => {
-      if (this.isDashOnCooldown) {
-        return;
-      }
-
-      const velocityX = this.player.body.velocity.x
-      const velocityY = this.player.body.velocity.y
-
-      this.isDashOnCooldown = true;
-      this.isPlayerStopInput = true;
-
-
-      this.player.body.setVelocity(
-        velocityX * DASH_VELOCITY_SCALE, 
-        velocityY * DASH_VELOCITY_SCALE
-      );
-
-      // Dash movement
-      this.time.delayedCall(DASH_TIME_MS, () => {
-        this.isPlayerStopInput = false;
-      });
-
-      // Dash cooldown.
-      this.time.delayedCall(DASH_COOLDOWN_MS, () => {
-        this.isDashOnCooldown = false;
-      });
-    });
-
-    // Collision.
-    this.player.body.setCollideWorldBounds(true);
-    this.physics.add.collider(this.player, this.blockGroup);
-    this.physics.add.collider(this.player, this.treeGroup);
-
-    // Camera.
-    this.cameras.main.setBounds(-TILE_SIZE / 2, -TILE_SIZE / 2, MAP_WIDTH, MAP_HEIGHT);
-    this.cameras.main.startFollow(this.player, true);
-    this.cameras.main.setZoom(1);
+    this.manager = new GameManager(this);
+    this.manager.create();
   }
 
   update(): void {
-    // Reset button.
-    if (this.keys.R.isDown) {
-      resetGame();
-      return;
-    }
-
-    if (!this.isPlayerStopInput) {
-      // Player movement.
-      const isUp = this.keys.UP.isDown || this.keys.W.isDown;
-      const isLeft = this.keys.LEFT.isDown || this.keys.A.isDown;
-      const isDown = this.keys.DOWN.isDown || this.keys.S.isDown;
-      const isRight = this.keys.RIGHT.isDown || this.keys.D.isDown;
-
-      let velocityX = 0;
-      let velocityY = 0;
-
-      if (isUp) {
-        this.player.setTexture("player_up")
-        velocityY = -1;
-      } else if (isDown) {
-        this.player.setTexture("player_down")
-        velocityY = 1;
-      }
-
-      if (isLeft) {
-        this.player.setTexture("player_left")
-        velocityX = -1;
-      } else if (isRight) {
-        this.player.setTexture("player_right")
-        velocityX = 1;
-      }
-
-      const vec = new Phaser.Math.Vector2(velocityX, velocityY)
-        .normalize()
-        .scale(PLAYER_SPEED);
-
-      this.player.body.setVelocity(vec.x, vec.y);
-    }
-
-    // Update currently holding.
-    // if (this.keys.ONE.isDown) {
-    //   this.inventoryCurrHolding = 1;
-    // }
-    this._updateInventoryText();
-
-    // Block placement.
-    this.isInvalidPlacement =
-      this.physics.overlap(this.player, this.hoverBox) ||
-      this.physics.overlap(this.treeGroup, this.hoverBox);
-
+    this.manager.update();
   }
 }
-
-// ==================== MAIN ====================
 
 const gameCanvas = document.getElementById('gameCanvas') as HTMLCanvasElement | null;
 
